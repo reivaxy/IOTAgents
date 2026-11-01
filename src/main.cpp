@@ -97,7 +97,7 @@ void loop() {
   httpServer.handleClient();
   timeSync.update();
   smsRelayScanner.update();
-  display.update(timeSync);
+  display.update(timeSync, smsRelayScanner.isNotFound());
   display.refresh();
 
   if (rebootAt != 0 && static_cast<int32_t>(millis() - rebootAt) >= 0) {

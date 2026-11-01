@@ -13,6 +13,9 @@ input{width:100%;box-sizing:border-box;padding:.4em}
 input[type=checkbox]{width:auto;margin-right:.5em}
 button{margin-top:1em;padding:.5em 1em}
 .ok{color:green}.nok{color:red}
+.row{display:flex;gap:.5em;align-items:flex-end}
+.row label{flex:1}
+.row button{margin-top:0}
 )rawliteral";
 
 static const char HOME_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
@@ -81,7 +84,11 @@ static const char CONFIG_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
 <label>SSID<input id="apSsid" maxlength="32"></label>
 <label>Password (8-63 characters)<input id="apPwd" type="password" maxlength="63" autocomplete="new-password" placeholder="leave blank to keep current"></label>
 <h2>SmsRelay</h2>
+<div class="row">
 <label>IP address<input id="smsRelayIp" maxlength="15" inputmode="decimal" pattern="\d{1,3}(\.\d{1,3}){3}" placeholder="not found yet"></label>
+<button type="button" id="scan">Scan</button>
+</div>
+<p id="smsg"></p>
 <button type="submit">Save</button>
 </form>
 <p id="msg"></p>
@@ -112,6 +119,7 @@ async function load(){
     $('apSsid').value=d.apSsid||d.apSsidDefault;
     $('flip').checked=d.flipScreen;
     $('smsRelayIp').value=d.smsRelayIp;
+    if(d.smsRelayScanning)waitScan();
     $('gitHash').textContent=d.gitHash;
     $('buildTime').textContent=d.buildTime;
   }catch(e){msg('Unable to load configuration: '+e.message,false);}
@@ -126,8 +134,31 @@ $('f').addEventListener('submit',async e=>{
     const d=await r.json();
     if(!r.ok)throw new Error(d.error||('HTTP '+r.status));
     $('homePwd').value='';$('apPwd').value='';
-    msg(d.reboot?'Saved. The module is rebooting to apply the WiFi settings; reconnect to the network afterwards.':'Saved.',true);
+    msg(d.reboot?'Saved. The module is rebooting to apply the WiFi settings; reconnect to the network afterwards.':d.smsRelayReachable===false?'Saved, but SmsRelay did not answer at this IP.':'Saved.',d.smsRelayReachable!==false);
   }catch(err){msg('Save failed: '+err.message,false);}
+});
+const sm=(t,ok)=>{$('smsg').textContent=t;$('smsg').className=ok?'ok':'nok';};
+// Polls the module until its background SmsRelay scan is over, then shows the result.
+async function waitScan(){
+  $('scan').disabled=true;sm('Scanning the network for SmsRelay...',true);
+  try{
+    const r=await fetch('/api/config');
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    const d=await r.json();
+    if(d.smsRelayScanning){setTimeout(waitScan,2000);return;}
+    $('smsRelayIp').value=d.smsRelayIp;
+    if(d.smsRelayIp)sm('SmsRelay IP: '+d.smsRelayIp,true);else sm('SmsRelay not found',false);
+  }catch(e){sm('Unable to read scan status: '+e.message,false);}
+  $('scan').disabled=false;
+}
+$('scan').addEventListener('click',async()=>{
+  $('scan').disabled=true;
+  try{
+    const r=await fetch('/api/smsrelay/scan',{method:'POST'});
+    const d=await r.json();
+    if(!r.ok)throw new Error(d.error||('HTTP '+r.status));
+    waitScan();
+  }catch(err){$('scan').disabled=false;sm('Scan failed: '+err.message,false);}
 });
 load();
 $('flip').addEventListener('change',async()=>{

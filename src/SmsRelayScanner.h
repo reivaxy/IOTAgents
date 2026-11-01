@@ -7,11 +7,15 @@
 
 #include "Config.h"
 
+#define IP_START 140
+#define IP_END 150
+
 // Finds the SmsRelay module on the home network (/24 subnet of this module) by calling
 // /api/ping on x.x.x.0 .. x.x.x.255 until the answer is "SmsRelay", then stores the IP.
 // Non blocking by steps: update() probes a single address per call, so it must be called
-// from loop(). The scan starts automatically once connected to the home network, unless an
-// SmsRelay IP is already stored. start() forces a new scan.
+// from loop(). Once connected to the home network, a stored SmsRelay IP is checked with
+// /api/ping; the scan starts automatically if none is stored or if the stored one does not
+// answer. start() forces a new scan.
 class SmsRelayScanner {
  public:
   void begin(Config& config, ConfigStore& store) {
@@ -23,7 +27,7 @@ class SmsRelayScanner {
   bool start() {
     if (!isStaConnected()) return false;
     prefix_ = WiFi.localIP();
-    next_ = 2;
+    next_ = IP_START;
     scanning_ = true;
     // Modem sleep delays ARP replies and SYN-ACKs (buffered by the AP until the next beacon),
     // which makes short connect timeouts fail even for hosts that are up.
@@ -34,7 +38,37 @@ class SmsRelayScanner {
 
   bool isScanning() const { return scanning_; }
 
+  // True when no SmsRelay is known: either a scan ended without leaving any IP stored, or the
+  // last manually saved IP did not answer. Never true while scanning.
+  bool isNotFound() const {
+    return !scanning_ && ((autoChecked_ && config_->smsRelayIp.isEmpty()) || manualCheckFailed_);
+  }
+
   void stop() { finish(); }
+
+  // Calls /api/ping on a manually entered IP and remembers whether SmsRelay answered (this drives
+  // isNotFound()). An empty IP clears the failure. Nothing is checked (true is returned) when not
+  // connected to the home network. Blocks for up to the connect + read timeouts.
+  bool verify(const String& ip) {
+    if (ip.isEmpty()) {
+      manualCheckFailed_ = false;
+      return true;
+    }
+    if (!isStaConnected()) return true;
+
+    IPAddress addr;
+    if (!addr.fromString(ip)) return false;
+    const String url = pingUrl(addr);
+    Serial.printf("SmsRelay check: %s\n", url.c_str());
+    const bool ok = probe(url);
+    manualCheckFailed_ = !ok;
+    Serial.printf("SmsRelay check: %s\n", ok ? "answered" : "no answer");
+    return ok;
+  }
+
+  static bool isStaConnected() {
+    return WiFi.getMode() == WIFI_STA && WiFi.status() == WL_CONNECTED;
+  }
 
   void update() {
     if (!isStaConnected()) return;
@@ -44,7 +78,11 @@ class SmsRelayScanner {
       if (config_->smsRelayIp.isEmpty()) {
         start();
       } else {
-        Serial.printf("SmsRelay IP already known: %s\n", config_->smsRelayIp.c_str());
+        Serial.printf("SmsRelay IP stored: %s, checking it\n", config_->smsRelayIp.c_str());
+        if (!verify(config_->smsRelayIp)) {
+          Serial.println("Stored SmsRelay IP does not answer, scanning the network");
+          start();
+        }
       }
     }
 
@@ -58,12 +96,13 @@ class SmsRelayScanner {
     if (candidate != self && probe(url)) {
       config_->smsRelayIp = candidate.toString();
       store_->saveSmsRelayIp(*config_);
+      manualCheckFailed_ = false;
       finish();
       Serial.printf("SmsRelay found at %s\n", config_->smsRelayIp.c_str());
       return;
     }
 
-    if (++next_ > 255) {
+    if (++next_ > IP_END) {
       finish();
       Serial.println("SmsRelay scan finished: not found");
     }
@@ -79,17 +118,14 @@ class SmsRelayScanner {
   ConfigStore* store_ = nullptr;
   bool autoChecked_ = false;
   bool scanning_ = false;
+  bool manualCheckFailed_ = false;
   IPAddress prefix_;
-  uint16_t next_ = 0;
+  uint16_t next_ = IP_START;
 
   void finish() {
     if (!scanning_) return;
     scanning_ = false;
     WiFi.setSleep(true);  // back to the default power saving mode
-  }
-
-  static bool isStaConnected() {
-    return WiFi.getMode() == WIFI_STA && WiFi.status() == WL_CONNECTED;
   }
 
   // Plain http (never https): the client used below is a non secure WiFiClient.

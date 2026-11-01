@@ -33,12 +33,25 @@ class Display {
     if (display_ != nullptr) display_->setTitle(title.c_str());
   }
 
-  // Updates the IP and time (last line) once per second.
-  void update(const TimeSync& timeSync) {
+  // Updates the IP and time (last line) once per second. While smsRelayMissing is true,
+  // lines 2 and 3 show a warning.
+  void update(const TimeSync& timeSync, bool smsRelayMissing) {
     if (display_ == nullptr) return;
     if (lastUpdate_ != 0 && millis() - lastUpdate_ < UPDATE_MS) return;
     lastUpdate_ = millis();
     if (lastUpdate_ == 0) lastUpdate_ = 1;
+
+    if (smsRelayMissing != warningShown_) {
+      warningShown_ = smsRelayMissing;
+      display_->setLineAlignment(LINE_WARNING_TITLE, TEXT_ALIGN_CENTER);
+      display_->setLine(LINE_WARNING_TITLE, "WARNING", false, true);
+      display_->setLineAlignment(LINE_WARNING_TEXT, TEXT_ALIGN_CENTER);
+      display_->setLine(LINE_WARNING_TEXT, "SmsRelay not found" );
+    }
+    if (!smsRelayMissing) {
+      display_->setLine(LINE_WARNING_TITLE, "", false, false);
+      display_->setLine(LINE_WARNING_TEXT, "");
+    }
 
     String ip;
     const wifi_mode_t mode = WiFi.getMode();
@@ -73,9 +86,12 @@ class Display {
   static constexpr int OLED_ADDR = 0x3C;
   static constexpr int OLED_SDA = 23;
   static constexpr int OLED_SCL = 18;
+  static constexpr int LINE_WARNING_TITLE = 1;
+  static constexpr int LINE_WARNING_TEXT = 2;
   static constexpr int LINE_STATUS = 4;  // last line: "<ip>   <time>", centered
   static constexpr uint32_t UPDATE_MS = 1000;
 
   DisplayClass* display_ = nullptr;
   uint32_t lastUpdate_ = 0;
+  bool warningShown_ = false;
 };

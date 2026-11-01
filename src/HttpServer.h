@@ -106,6 +106,7 @@ class HttpServer {
     doc["apSsidDefault"] = ConfigDefaults::AP_SSID;
     doc["flipScreen"] = config_.flipScreen;
     doc["smsRelayIp"] = config_.smsRelayIp;
+    doc["smsRelayScanning"] = smsRelayScanner_.isScanning();
     doc["gitHash"] = BUILD_GIT_HASH;
     doc["buildTime"] = BUILD_TIME;
     sendJson(200, doc);
@@ -192,14 +193,21 @@ class HttpServer {
 
     config_ = next;
     configStore_.save(config_);
-    if (!next.smsRelayIp.isEmpty() && next.smsRelayIp != previousRelayIp) {
-      smsRelayScanner_.stop();  // a manually entered IP wins over a running scan
+    // A manually entered IP wins over a running scan, and is checked with /api/ping: the
+    // display warning follows the result (an empty IP clears a previous failure).
+    bool relayChecked = false;
+    bool relayReachable = true;
+    if (next.smsRelayIp != previousRelayIp) {
+      if (!next.smsRelayIp.isEmpty()) smsRelayScanner_.stop();
+      relayChecked = !next.smsRelayIp.isEmpty() && SmsRelayScanner::isStaConnected();
+      relayReachable = smsRelayScanner_.verify(next.smsRelayIp);
     }
     display_.setTitle(config_.name);
 
     JsonDocument res;
     res["ok"] = true;
     res["reboot"] = wifiChanged;
+    if (relayChecked) res["smsRelayReachable"] = relayReachable;
     sendJson(200, res);
 
     if (wifiChanged) {

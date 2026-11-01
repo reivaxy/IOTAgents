@@ -24,18 +24,20 @@ static const char HOME_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
 <tr><td>Light</td><td id="light">-</td></tr>
 <tr><td>Temperature</td><td id="temp">-</td></tr>
 <tr><td>Water level</td><td id="water">-</td></tr>
-<tr><td>Module time (UTC)</td><td id="time">-</td></tr>
+<tr><td>Module time</td><td id="time">-</td></tr>
 </table>
 <p id="err" class="nok"></p>
 <script>
 const REFRESH_MS=10000;
-let baseEpoch=null,baseTick=0;
+let baseEpoch=null,baseTick=0,utcOffset=0;
 function showTime(){
   const t=document.getElementById('time');
   if(baseEpoch===null){t.textContent='Not synchronised';return;}
   // Module epoch advanced by elapsed time since the last fetch; the browser clock is not used.
-  const s=baseEpoch+Math.floor((performance.now()-baseTick)/1000);
-  t.textContent=new Date(s*1000).toISOString().slice(0,19).replace('T',' ');
+  const s=baseEpoch+utcOffset+Math.floor((performance.now()-baseTick)/1000);
+  const a=Math.abs(utcOffset);
+  const z='UTC'+(utcOffset<0?'-':'+')+String(Math.floor(a/3600)).padStart(2,'0')+':'+String(Math.floor(a%3600/60)).padStart(2,'0');
+  t.textContent=new Date(s*1000).toISOString().slice(0,19).replace('T',' ')+' ('+z+')';
 }
 async function refresh(){
   try{
@@ -49,7 +51,7 @@ async function refresh(){
     const w=document.getElementById('water');
     w.textContent=d.waterLevelOk?'OK':'NOK';
     w.className=d.waterLevelOk?'ok':'nok';
-    baseEpoch=d.epoch;baseTick=performance.now();
+    baseEpoch=d.epoch;utcOffset=d.utcOffset||0;baseTick=performance.now();
     showTime();
     document.getElementById('err').textContent='';
   }catch(e){

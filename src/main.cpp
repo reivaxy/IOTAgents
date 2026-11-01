@@ -93,6 +93,7 @@ void handleStatus() {
   doc["waterLevelOk"] = sensor.isWaterLevelOk();
   if (timeSync.isSynced()) {
     doc["epoch"] = static_cast<int64_t>(timeSync.now());
+    doc["utcOffset"] = timeSync.utcOffset();
   } else {
     doc["epoch"] = nullptr;
   }
@@ -212,6 +213,7 @@ void setup() {
   delay(100);
 
   config = configStore.load();
+  timeSync.begin(config, configStore);
   sensor.begin();
   startWifi();
 

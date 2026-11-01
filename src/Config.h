@@ -15,6 +15,8 @@ struct Config {
   String homePwd;
   String apSsid;
   String apPwd;
+  int32_t utcOffset = 0;        // seconds, valid only if utcOffsetReadAt > 0
+  int64_t utcOffsetReadAt = 0;  // Unix epoch (UTC) when utcOffset was fetched; 0 = never
 };
 
 // Persists Config in NVS through Preferences.
@@ -29,6 +31,8 @@ class ConfigStore {
     c.homePwd = prefs.getString("homePwd", "");
     c.apSsid = prefs.getString("apSsid", "");
     c.apPwd = prefs.getString("apPwd", "");
+    c.utcOffset = prefs.getInt("utcOffset", 0);
+    c.utcOffsetReadAt = prefs.getLong64("utcOffsetAt", 0);
     prefs.end();
     return c;
   }
@@ -41,6 +45,14 @@ class ConfigStore {
     prefs.putString("homePwd", c.homePwd);
     prefs.putString("apSsid", c.apSsid);
     prefs.putString("apPwd", c.apPwd);
+    prefs.end();
+  }
+
+  void saveUtcOffset(const Config& c) {
+    Preferences prefs;
+    prefs.begin(NAMESPACE, false);
+    prefs.putInt("utcOffset", c.utcOffset);
+    prefs.putLong64("utcOffsetAt", c.utcOffsetReadAt);
     prefs.end();
   }
 

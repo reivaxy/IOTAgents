@@ -80,6 +80,8 @@ static const char CONFIG_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
 <h2>Local network (AP)</h2>
 <label>SSID<input id="apSsid" maxlength="32"></label>
 <label>Password (8-63 characters)<input id="apPwd" type="password" maxlength="63" autocomplete="new-password" placeholder="leave blank to keep current"></label>
+<h2>SmsRelay</h2>
+<label>IP address<input id="smsRelayIp" maxlength="15" inputmode="decimal" pattern="\d{1,3}(\.\d{1,3}){3}" placeholder="not found yet"></label>
 <button type="submit">Save</button>
 </form>
 <p id="msg"></p>
@@ -109,13 +111,14 @@ async function load(){
     $('homeSsid').value=d.homeSsid;
     $('apSsid').value=d.apSsid||d.apSsidDefault;
     $('flip').checked=d.flipScreen;
+    $('smsRelayIp').value=d.smsRelayIp;
     $('gitHash').textContent=d.gitHash;
     $('buildTime').textContent=d.buildTime;
   }catch(e){msg('Unable to load configuration: '+e.message,false);}
 }
 $('f').addEventListener('submit',async e=>{
   e.preventDefault();
-  const body={name:$('name').value,homeSsid:$('homeSsid').value,apSsid:$('apSsid').value};
+  const body={name:$('name').value,homeSsid:$('homeSsid').value,apSsid:$('apSsid').value,smsRelayIp:$('smsRelayIp').value};
   if($('homePwd').value)body.homePwd=$('homePwd').value;
   if($('apPwd').value)body.apPwd=$('apPwd').value;
   try{

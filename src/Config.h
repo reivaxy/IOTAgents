@@ -16,6 +16,7 @@ struct Config {
   String apSsid;
   String apPwd;
   bool flipScreen = true;       // rotate the display by 180 degrees
+  String smsRelayIp;            // empty = not discovered yet
   int32_t utcOffset = 0;        // seconds, valid only if utcOffsetReadAt > 0
   int64_t utcOffsetReadAt = 0;  // Unix epoch (UTC) when utcOffset was fetched; 0 = never
 };
@@ -33,6 +34,7 @@ class ConfigStore {
     c.apSsid = prefs.getString("apSsid", "");
     c.apPwd = prefs.getString("apPwd", "");
     c.flipScreen = prefs.getBool("flip", true);
+    c.smsRelayIp = prefs.getString("smsRelayIp", "");
     c.utcOffset = prefs.getInt("utcOffset", 0);
     c.utcOffsetReadAt = prefs.getLong64("utcOffsetAt", 0);
     prefs.end();
@@ -47,6 +49,7 @@ class ConfigStore {
     prefs.putString("homePwd", c.homePwd);
     prefs.putString("apSsid", c.apSsid);
     prefs.putString("apPwd", c.apPwd);
+    prefs.putString("smsRelayIp", c.smsRelayIp);
     prefs.end();
   }
 
@@ -54,6 +57,13 @@ class ConfigStore {
     Preferences prefs;
     prefs.begin(NAMESPACE, false);
     prefs.putBool("flip", c.flipScreen);
+    prefs.end();
+  }
+
+  void saveSmsRelayIp(const Config& c) {
+    Preferences prefs;
+    prefs.begin(NAMESPACE, false);
+    prefs.putString("smsRelayIp", c.smsRelayIp);
     prefs.end();
   }
 

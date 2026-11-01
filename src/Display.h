@@ -42,11 +42,14 @@ class Display {
 
     String ip;
     const wifi_mode_t mode = WiFi.getMode();
-    if (mode == WIFI_STA && WiFi.status() == WL_CONNECTED) {
+    const bool connected = mode == WIFI_STA && WiFi.status() == WL_CONNECTED;
+    if (connected) {
       ip = WiFi.localIP().toString();
     } else if (mode == WIFI_AP) {
       ip = WiFi.softAPIP().toString();
     }
+    // Top right icon: steady when connected to the home network, blinking otherwise.
+    display_->wifiIcon(!connected, mode == WIFI_AP ? AP : STA);
     String status = ip;
 
     if (timeSync.isSynced()) {

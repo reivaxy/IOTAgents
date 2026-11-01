@@ -1,10 +1,12 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
+#include <Update.h>
 #include <WebServer.h>
 #include <WiFi.h>
 
 #include "BuildInfo.h"
 #include "Config.h"
+#include "Display.h"
 #include "Sensor.h"
 #include "TimeSync.h"
 #include "WebPages.h"
@@ -21,7 +23,13 @@ ConfigStore configStore;
 Config config;
 Sensor sensor;
 TimeSync timeSync;
+Display display;
 uint32_t rebootAt = 0;  // 0 = no reboot pending
+
+void scheduleReboot() {
+  rebootAt = millis() + REBOOT_DELAY_MS;
+  if (rebootAt == 0) rebootAt = 1;
+}
 
 // ---------------------------------------------------------------- WiFi
 
@@ -107,6 +115,7 @@ void handleGetConfig() {
   doc["homeSsid"] = config.homeSsid;
   doc["apSsid"] = config.apSsid;
   doc["apSsidDefault"] = ConfigDefaults::AP_SSID;
+  doc["flipScreen"] = config.flipScreen;
   doc["gitHash"] = BUILD_GIT_HASH;
   doc["buildTime"] = BUILD_TIME;
   sendJson(200, doc);
@@ -184,6 +193,7 @@ void handleSetConfig() {
 
   config = next;
   configStore.save(config);
+  display.setTitle(config.name);
 
   JsonDocument res;
   res["ok"] = true;
@@ -191,9 +201,83 @@ void handleSetConfig() {
   sendJson(200, res);
 
   if (wifiChanged) {
-    rebootAt = millis() + REBOOT_DELAY_MS;
-    if (rebootAt == 0) rebootAt = 1;
+    scheduleReboot();
   }
+}
+
+// Saves the screen orientation and applies it immediately (no reboot needed).
+void handleSetDisplay() {
+  JsonDocument doc;
+  if (deserializeJson(doc, server.arg("plain"))) {
+    sendError(400, "Invalid JSON");
+    return;
+  }
+  JsonVariantConst flip = doc["flipScreen"];
+  if (!flip.is<bool>()) {
+    sendError(400, "flipScreen must be a boolean");
+    return;
+  }
+
+  config.flipScreen = flip.as<bool>();
+  configStore.saveFlipScreen(config);
+  display.setFlip(config.flipScreen);
+
+  JsonDocument res;
+  res["ok"] = true;
+  sendJson(200, res);
+}
+
+// ---------------------------------------------------------------- OTA
+
+String updateError;
+bool updateDone = false;
+
+// Receives the multipart firmware upload chunk by chunk and writes it to the next OTA partition.
+void handleUpdateUpload() {
+  HTTPUpload& upload = server.upload();
+  switch (upload.status) {
+    case UPLOAD_FILE_START:
+      updateError = "";
+      updateDone = false;
+      Serial.printf("OTA update started: %s\n", upload.filename.c_str());
+      if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {
+        updateError = Update.errorString();
+      }
+      break;
+    case UPLOAD_FILE_WRITE:
+      if (updateError.isEmpty() && Update.write(upload.buf, upload.currentSize) != upload.currentSize) {
+        updateError = Update.errorString();
+      }
+      break;
+    case UPLOAD_FILE_END:
+      if (updateError.isEmpty()) {
+        if (Update.end(true)) {
+          updateDone = true;
+        } else {
+          updateError = Update.errorString();
+        }
+      }
+      break;
+    case UPLOAD_FILE_ABORTED:
+      Update.abort();
+      updateError = "Upload aborted";
+      break;
+  }
+}
+
+void handleUpdateDone() {
+  if (updateDone && updateError.isEmpty()) {
+    Serial.println("OTA update succeeded");
+    JsonDocument res;
+    res["ok"] = true;
+    res["reboot"] = true;
+    sendJson(200, res);
+    scheduleReboot();
+  } else {
+    Serial.printf("OTA update failed: %s\n", updateError.c_str());
+    sendError(500, updateError.isEmpty() ? "No firmware received" : updateError.c_str());
+  }
+  updateDone = false;
 }
 
 void setupRoutes() {
@@ -203,6 +287,8 @@ void setupRoutes() {
   server.on("/api/status", HTTP_GET, handleStatus);
   server.on("/api/config", HTTP_GET, handleGetConfig);
   server.on("/api/config", HTTP_POST, handleSetConfig);
+  server.on("/api/display", HTTP_POST, handleSetDisplay);
+  server.on("/api/update", HTTP_POST, handleUpdateDone, handleUpdateUpload);
   server.onNotFound([]() { server.send(404, "text/plain", "Not found"); });
 }
 
@@ -213,6 +299,9 @@ void setup() {
   delay(100);
 
   config = configStore.load();
+
+  display.begin(config.name, config.flipScreen);
+
   timeSync.begin(config, configStore);
   sensor.begin();
   startWifi();
@@ -225,9 +314,11 @@ void setup() {
 void loop() {
   server.handleClient();
   timeSync.update();
+  display.update(timeSync);
+  display.refresh();
 
   if (rebootAt != 0 && static_cast<int32_t>(millis() - rebootAt) >= 0) {
-    Serial.println("Rebooting to apply WiFi settings");
+    Serial.println("Rebooting");
     ESP.restart();
   }
 }

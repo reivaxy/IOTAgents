@@ -10,6 +10,7 @@ td{padding:.5em;border-bottom:1px solid #ddd}
 td:last-child{text-align:right;font-weight:bold}
 label{display:block;margin-top:.8em}
 input{width:100%;box-sizing:border-box;padding:.4em}
+input[type=checkbox]{width:auto;margin-right:.5em}
 button{margin-top:1em;padding:.5em 1em}
 .ok{color:green}.nok{color:red}
 )rawliteral";
@@ -82,11 +83,20 @@ static const char CONFIG_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
 <button type="submit">Save</button>
 </form>
 <p id="msg"></p>
+<h2>Display</h2>
+<label><input id="flip" type="checkbox">Flip screen by 180°</label>
+<p id="dmsg"></p>
 <h2>Firmware</h2>
 <table>
 <tr><td>Git commit</td><td id="gitHash">-</td></tr>
 <tr><td>Build time</td><td id="buildTime">-</td></tr>
 </table>
+<form id="u">
+<label>Firmware file (.bin)<input id="fw" type="file" accept=".bin" required></label>
+<button id="ub" type="submit">Upload and update</button>
+<progress id="up" value="0" max="100" hidden></progress>
+</form>
+<p id="umsg"></p>
 <script>
 const $=id=>document.getElementById(id);
 const msg=(t,ok)=>{$('msg').textContent=t;$('msg').className=ok?'ok':'nok';};
@@ -98,6 +108,7 @@ async function load(){
     $('name').value=d.name;
     $('homeSsid').value=d.homeSsid;
     $('apSsid').value=d.apSsid||d.apSsidDefault;
+    $('flip').checked=d.flipScreen;
     $('gitHash').textContent=d.gitHash;
     $('buildTime').textContent=d.buildTime;
   }catch(e){msg('Unable to load configuration: '+e.message,false);}
@@ -116,6 +127,35 @@ $('f').addEventListener('submit',async e=>{
   }catch(err){msg('Save failed: '+err.message,false);}
 });
 load();
+$('flip').addEventListener('change',async()=>{
+  const dm=(t,ok)=>{$('dmsg').textContent=t;$('dmsg').className=ok?'ok':'nok';};
+  try{
+    const r=await fetch('/api/display',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({flipScreen:$('flip').checked})});
+    const d=await r.json();
+    if(!r.ok)throw new Error(d.error||('HTTP '+r.status));
+    dm('Saved.',true);
+  }catch(err){$('flip').checked=!$('flip').checked;dm('Save failed: '+err.message,false);}
+});
+$('u').addEventListener('submit',e=>{
+  e.preventDefault();
+  const file=$('fw').files[0];
+  if(!file)return;
+  const um=(t,ok)=>{$('umsg').textContent=t;$('umsg').className=ok?'ok':'nok';};
+  const fd=new FormData();
+  fd.append('firmware',file,file.name);
+  const xhr=new XMLHttpRequest();
+  xhr.open('POST','/api/update');
+  xhr.upload.onprogress=ev=>{if(ev.lengthComputable){$('up').value=ev.loaded*100/ev.total;}};
+  xhr.onload=()=>{
+    $('ub').disabled=false;
+    let d={};try{d=JSON.parse(xhr.responseText);}catch(_){}
+    if(xhr.status===200){um('Update successful. The module is rebooting; reload this page in a few seconds.',true);}
+    else{um('Update failed: '+(d.error||('HTTP '+xhr.status)),false);}
+  };
+  xhr.onerror=()=>{$('ub').disabled=false;um('Update failed: connection error',false);};
+  $('ub').disabled=true;$('up').hidden=false;$('up').value=0;um('Uploading...',true);
+  xhr.send(fd);
+});
 </script>
 </body></html>
 )rawliteral";

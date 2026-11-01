@@ -7,13 +7,14 @@
 
 #include "TimeSync.h"
 
-// SSD1306 OLED display: title (module name), IP address on line 0 and local date/time
-// on the last line. Call begin() once from setup(), then update() and refresh() from loop().
+// SSD1306 OLED display: title (module name) and, on the last line, the IP address and the
+// local time centered. Call begin() once from setup(), then update() and refresh() from loop().
 class Display {
  public:
   // Created here rather than in a constructor: I2C must not be used before Arduino init.
   void begin(const String& title, bool flip) {
     display_ = new DisplayClass(OLED_ADDR, OLED_SDA, OLED_SCL, flip);
+    display_->setLineAlignment(LINE_STATUS, TEXT_ALIGN_CENTER);
     display_->setTitle(title.c_str());
     display_->refresh();
   }
@@ -32,7 +33,7 @@ class Display {
     if (display_ != nullptr) display_->setTitle(title.c_str());
   }
 
-  // Updates the IP and date/time lines once per second.
+  // Updates the IP and time (last line) once per second.
   void update(const TimeSync& timeSync) {
     if (display_ == nullptr) return;
     if (lastUpdate_ != 0 && millis() - lastUpdate_ < UPDATE_MS) return;
@@ -46,17 +47,19 @@ class Display {
     } else if (mode == WIFI_AP) {
       ip = WiFi.softAPIP().toString();
     }
-    display_->setLine(LINE_IP, ip.c_str());
+    String status = ip;
 
-    char dateTime[20] = "";
     if (timeSync.isSynced()) {
       // configTime() already applies the UTC offset, so localtime_r gives local time.
       const time_t now = timeSync.now();
       struct tm tmLocal;
       localtime_r(&now, &tmLocal);
-      strftime(dateTime, sizeof(dateTime), "%Y-%m-%d %H:%M:%S", &tmLocal);
+      char timeText[9];
+      strftime(timeText, sizeof(timeText), "%H:%M:%S", &tmLocal);
+      if (!status.isEmpty()) status += "   ";
+      status += timeText;
     }
-    display_->setLine(LINE_DATETIME, dateTime);
+    display_->setLine(LINE_STATUS, status.c_str());
   }
 
   void refresh() {
@@ -67,8 +70,7 @@ class Display {
   static constexpr int OLED_ADDR = 0x3C;
   static constexpr int OLED_SDA = 23;
   static constexpr int OLED_SCL = 18;
-  static constexpr int LINE_IP = 0;        // left aligned
-  static constexpr int LINE_DATETIME = 4;  // last line, right aligned (set by DisplayClass)
+  static constexpr int LINE_STATUS = 4;  // last line: "<ip>   <time>", centered
   static constexpr uint32_t UPDATE_MS = 1000;
 
   DisplayClass* display_ = nullptr;

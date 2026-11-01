@@ -16,6 +16,7 @@ button{margin-top:1em;padding:.5em 1em}
 .row{display:flex;gap:.5em;align-items:flex-end}
 .row label{flex:1}
 .row button{margin-top:0}
+.alert{background:#fdecea;color:#b71c1c;border:1px solid #f5c6cb;padding:.6em;margin-bottom:1em;border-radius:4px}
 )rawliteral";
 
 static const char HOME_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
@@ -24,6 +25,7 @@ static const char HOME_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
 <body>
 <nav><a href="/config">Configuration</a></nav>
 <h1 id="name">...</h1>
+<div id="relay" class="alert" hidden>SmsRelay not found: alerts cannot be sent. Check the <a href="/config">configuration</a>.</div>
 <table>
 <tr><td>Light</td><td id="light">-</td></tr>
 <tr><td>Temperature</td><td id="temp">-</td></tr>
@@ -55,6 +57,7 @@ async function refresh(){
     const w=document.getElementById('water');
     w.textContent=d.waterLevelOk?'OK':'NOK';
     w.className=d.waterLevelOk?'ok':'nok';
+    document.getElementById('relay').hidden=!d.smsRelayNotFound;
     baseEpoch=d.epoch;utcOffset=d.utcOffset||0;baseTick=performance.now();
     showTime();
     document.getElementById('err').textContent='';
@@ -76,7 +79,7 @@ static const char CONFIG_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
 <nav><a href="/">Home</a></nav>
 <h1>Configuration</h1>
 <form id="f">
-<label>Module name<input id="name" maxlength="32" required></label>
+<label>Module name<input id="name" maxlength="10" required></label>
 <h2>Home network (STA)</h2>
 <label>SSID<input id="homeSsid" maxlength="32"></label>
 <label>Password<input id="homePwd" type="password" maxlength="63" autocomplete="new-password" placeholder="leave blank to keep current"></label>
@@ -87,6 +90,7 @@ static const char CONFIG_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
 <div class="row">
 <label>IP address<input id="smsRelayIp" maxlength="15" inputmode="decimal" pattern="\d{1,3}(\.\d{1,3}){3}" placeholder="not found yet"></label>
 <button type="button" id="scan">Scan</button>
+<button type="button" id="ping">Ping</button>
 </div>
 <p id="smsg"></p>
 <button type="submit">Save</button>
@@ -159,6 +163,16 @@ $('scan').addEventListener('click',async()=>{
     if(!r.ok)throw new Error(d.error||('HTTP '+r.status));
     waitScan();
   }catch(err){$('scan').disabled=false;sm('Scan failed: '+err.message,false);}
+});
+$('ping').addEventListener('click',async()=>{
+  $('ping').disabled=true;sm('Pinging SmsRelay...',true);
+  try{
+    const r=await fetch('/api/smsrelay/ping',{method:'POST'});
+    const d=await r.json();
+    if(!r.ok)throw new Error(d.error||('HTTP '+r.status));
+    if(d.reachable)sm('SmsRelay answered.',true);else sm('SmsRelay did not answer.',false);
+  }catch(err){sm('Ping failed: '+err.message,false);}
+  $('ping').disabled=false;
 });
 load();
 $('flip').addEventListener('change',async()=>{

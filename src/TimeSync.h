@@ -118,6 +118,7 @@ class TimeSync {
     http.setConnectTimeout(HTTP_TIMEOUT_MS);
     http.setTimeout(HTTP_TIMEOUT_MS);
     http.setUserAgent("NewAquaMonitor/1.0");
+    http.setReuse(false);  // one request per connection: "Connection: close", socket closed by end()
     if (!http.begin(client, OFFSET_URL)) {
       return false;
     }
@@ -132,6 +133,7 @@ class TimeSync {
       }
     }
     http.end();
+    client.stop();  // explicit close, whatever the outcome (timeout, error or answer)
     return ok;
   }
 };

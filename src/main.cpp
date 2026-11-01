@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <WiFi.h>
 
+#include "Alert.h"
 #include "Config.h"
 #include "Display.h"
 #include "HttpServer.h"
@@ -10,12 +11,14 @@
 
 constexpr uint32_t STA_TIMEOUT_MS = 30000;
 constexpr uint32_t REBOOT_DELAY_MS = 1000;
+constexpr uint32_t QR_DURATION_MS = 20000;
 
 ConfigStore configStore;
 Config config;
 Sensor sensor;
 TimeSync timeSync;
 Display display;
+Alert alert;
 SmsRelayScanner smsRelayScanner;
 uint32_t rebootAt = 0;  // 0 = no reboot pending
 
@@ -44,6 +47,10 @@ bool connectSta() {
   }
 
   if (WiFi.status() == WL_CONNECTED) {
+    // Modem sleep delays ARP replies and SYN-ACKs (buffered by the AP until the next beacon),
+    // which makes short connect timeouts fail even for hosts that are up (SmsRelay checks and
+    // alerts). The module is mains powered, so keep the radio awake.
+    WiFi.setSleep(false);
     Serial.print("Connected, IP address: ");
     Serial.println(WiFi.localIP());
     return true;
@@ -86,11 +93,15 @@ void setup() {
   display.begin(config.name, config.flipScreen);
 
   timeSync.begin(config, configStore);
-  smsRelayScanner.begin(config, configStore);
+  alert.begin(config);
+  smsRelayScanner.begin(config, configStore, alert);
   sensor.begin();
   startWifi();
 
   httpServer.begin();
+
+  const IPAddress ip = WiFi.getMode() == WIFI_AP ? WiFi.softAPIP() : WiFi.localIP();
+  display.showQr(String("http://") + ip.toString() + "/", QR_DURATION_MS);
 }
 
 void loop() {

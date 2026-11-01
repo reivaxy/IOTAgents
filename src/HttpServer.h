@@ -38,7 +38,7 @@ class HttpServer {
   void handleClient() { server_.handleClient(); }
 
  private:
-  static constexpr size_t NAME_MAX_LEN = 32;
+  static constexpr size_t NAME_MAX_LEN = 10;
   static constexpr size_t SSID_MAX_LEN = 32;
   static constexpr size_t PWD_MIN_LEN = 8;
   static constexpr size_t PWD_MAX_LEN = 63;
@@ -64,15 +64,20 @@ class HttpServer {
     server_.on("/api/config", HTTP_POST, [this]() { handleSetConfig(); });
     server_.on("/api/display", HTTP_POST, [this]() { handleSetDisplay(); });
     server_.on("/api/smsrelay/scan", HTTP_POST, [this]() { handleSmsRelayScan(); });
+    server_.on("/api/smsrelay/ping", HTTP_POST, [this]() { handleSmsRelayPing(); });
     server_.on(
         "/api/update", HTTP_POST, [this]() { handleUpdateDone(); },
         [this]() { handleUpdateUpload(); });
     server_.onNotFound([this]() { server_.send(404, "text/plain", "Not found"); });
   }
 
-  void sendJson(int code, const JsonDocument& doc) {
+  void sendJson(int code, const JsonDocument& doc, bool pretty = false) {
     String out;
-    serializeJson(doc, out);
+    if (pretty) {
+      serializeJsonPretty(doc, out);
+    } else {
+      serializeJson(doc, out);
+    }
     server_.send(code, "application/json", out);
   }
 
@@ -88,13 +93,15 @@ class HttpServer {
     doc["light"] = sensor_.isLightOn();
     doc["temperature"] = sensor_.readTemperature();
     doc["waterLevelOk"] = sensor_.isWaterLevelOk();
+    doc["smsRelayNotFound"] = smsRelayScanner_.isNotFound();
+    doc["smsRelayIp"] = config_.smsRelayIp;
     if (timeSync_.isSynced()) {
       doc["epoch"] = static_cast<int64_t>(timeSync_.now());
       doc["utcOffset"] = timeSync_.utcOffset();
     } else {
       doc["epoch"] = nullptr;
     }
-    sendJson(200, doc);
+    sendJson(200, doc, false);
   }
 
   void handleGetConfig() {
@@ -157,7 +164,7 @@ class HttpServer {
     }
 
     if (next.name.isEmpty() || next.name.length() > NAME_MAX_LEN) {
-      sendError(400, "Module name must be 1-32 characters");
+      sendError(400, "Module name must be 1-10 characters");
       return;
     }
     if (next.homeSsid.length() > SSID_MAX_LEN || next.apSsid.length() > SSID_MAX_LEN) {
@@ -189,19 +196,15 @@ class HttpServer {
     const bool wifiChanged = next.homeSsid != config_.homeSsid || next.homePwd != config_.homePwd ||
                              next.apSsid != config_.apSsid || next.apPwd != config_.apPwd;
 
-    const String previousRelayIp = config_.smsRelayIp;
-
     config_ = next;
     configStore_.save(config_);
-    // A manually entered IP wins over a running scan, and is checked with /api/ping: the
-    // display warning follows the result (an empty IP clears a previous failure).
-    bool relayChecked = false;
-    bool relayReachable = true;
-    if (next.smsRelayIp != previousRelayIp) {
-      if (!next.smsRelayIp.isEmpty()) smsRelayScanner_.stop();
-      relayChecked = !next.smsRelayIp.isEmpty() && SmsRelayScanner::isStaConnected();
-      relayReachable = smsRelayScanner_.verify(next.smsRelayIp);
-    }
+    // A manually entered IP wins over a running scan, and is always checked with /api/ping (even
+    // if unchanged, with long timeouts): the display warning follows the result (an empty IP
+    // clears a previous failure).
+    if (!next.smsRelayIp.isEmpty()) smsRelayScanner_.stop();
+    const bool relayChecked = !next.smsRelayIp.isEmpty() && SmsRelayScanner::isStaConnected();
+    const bool relayReachable =
+        smsRelayScanner_.verify(next.smsRelayIp, SmsRelayScanner::SAVE_CHECK_TIMEOUT_MS);
     display_.setTitle(config_.name);
 
     JsonDocument res;
@@ -247,6 +250,24 @@ class HttpServer {
     res["ok"] = true;
     res["scanning"] = true;
     sendJson(202, res);
+  }
+
+  // Pings the stored SmsRelay IP now (blocks for a few seconds) and reports whether it answered.
+  // The result also drives the warning shown on the screen.
+  void handleSmsRelayPing() {
+    if (config_.smsRelayIp.isEmpty()) {
+      sendError(409, "No SmsRelay IP configured");
+      return;
+    }
+    if (!SmsRelayScanner::isStaConnected()) {
+      sendError(409, "Not connected to the home network");
+      return;
+    }
+    JsonDocument res;
+    res["ok"] = true;
+    res["reachable"] =
+        smsRelayScanner_.verify(config_.smsRelayIp, SmsRelayScanner::SAVE_CHECK_TIMEOUT_MS);
+    sendJson(200, res);
   }
 
   // Receives the multipart firmware upload chunk by chunk and writes it to the next OTA partition.

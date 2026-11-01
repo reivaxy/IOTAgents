@@ -3,6 +3,7 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <XIOTDisplay.h>
+#include <qrcode.h>
 #include <time.h>
 
 #include "TimeSync.h"
@@ -78,8 +79,51 @@ class Display {
     display_->setLine(LINE_STATUS, status.c_str());
   }
 
+  // Replaces the normal screen by a QR code of `text` for durationMs. The QR is drawn once;
+  // refresh() then leaves the screen untouched until the delay is over.
+  // Returns false if the text does not fit in the QR code.
+  bool showQr(const String& text, uint32_t durationMs) {
+    if (display_ == nullptr) return false;
+    QRCode qrcode;
+    uint8_t qrData[qrcode_getBufferSize(QR_VERSION)];
+    if (qrcode_initText(&qrcode, qrData, QR_VERSION, ECC_LOW, text.c_str()) != 0) {
+      Serial.println("QR code: text too long");
+      return false;
+    }
+
+    // Dark modules are drawn unlit on a lit background (including the quiet zone), which is
+    // the polarity phone scanners expect.
+    SSD1306* oled = display_->getDisplay();
+    const int size = (qrcode.size + 2 * QR_QUIET_ZONE) * QR_SCALE;
+    const int x0 = (SCREEN_WIDTH - size) / 2;
+    const int y0 = (SCREEN_HEIGHT - size) / 2;
+    oled->clear();
+    oled->setColor(WHITE);
+    oled->fillRect(x0, y0, size, size);
+    oled->setColor(BLACK);
+    for (uint8_t y = 0; y < qrcode.size; y++) {
+      for (uint8_t x = 0; x < qrcode.size; x++) {
+        if (qrcode_getModule(&qrcode, x, y)) {
+          oled->fillRect(x0 + (x + QR_QUIET_ZONE) * QR_SCALE, y0 + (y + QR_QUIET_ZONE) * QR_SCALE,
+                         QR_SCALE, QR_SCALE);
+        }
+      }
+    }
+    oled->setColor(WHITE);
+    oled->display();
+
+    qrUntil_ = millis() + durationMs;
+    if (qrUntil_ == 0) qrUntil_ = 1;
+    return true;
+  }
+
   void refresh() {
-    if (display_ != nullptr) display_->refresh();
+    if (display_ == nullptr) return;
+    if (qrUntil_ != 0) {
+      if (static_cast<int32_t>(millis() - qrUntil_) < 0) return;
+      qrUntil_ = 0;
+    }
+    display_->refresh();
   }
 
  private:
@@ -90,8 +134,16 @@ class Display {
   static constexpr int LINE_WARNING_TEXT = 2;
   static constexpr int LINE_STATUS = 4;  // last line: "<ip>   <time>", centered
   static constexpr uint32_t UPDATE_MS = 1000;
+  static constexpr int SCREEN_WIDTH = 128;
+  static constexpr int SCREEN_HEIGHT = 64;
+  // Version 2 (25x25 modules, low error correction) holds up to 32 bytes, enough for an
+  // http://<ip>/ URL. 2 px per module + 2 modules of quiet zone = 58 px, fits the 64 px height.
+  static constexpr uint8_t QR_VERSION = 2;
+  static constexpr int QR_SCALE = 2;
+  static constexpr int QR_QUIET_ZONE = 2;
 
   DisplayClass* display_ = nullptr;
   uint32_t lastUpdate_ = 0;
+  uint32_t qrUntil_ = 0;  // 0 = QR page not shown
   bool warningShown_ = false;
 };

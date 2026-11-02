@@ -1,3 +1,14 @@
+# Aquamonitor
+
+This device is intended to monitor a few critical parameters of a reef tank or other kind of aquarium:
+
+- water temperature
+- water level 
+- lighting schedule.
+
+It relies on the IOTAGents module base class and features (see next chapter) which comes from this repository "main" branch.
+
+
 # IOTAgents module architecture
 
 This project is built around a shared base class, `GenericModule`, and a set of device-specific implementations. The idea is:

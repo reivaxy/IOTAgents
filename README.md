@@ -13,7 +13,7 @@ The base contract is defined in `src/GenericModule.h`.
 The following parts are shared by every device:
 
 - WiFi connection and access point setup
-- configuration storage and loading
+- settings storage and loading
 - NTP / time sync
 - alert system and SMS relay handling: check the [companion project SMSRelay](https://github.com/reivaxy/SMSRelay) used to send SMS and Push notifications.
 - display lifecycle
@@ -31,7 +31,7 @@ Each module is different in behavior and UI. Typical per-module logic includes:
 - custom status data returned by `getStatus()`
 - custom rows / script injected on the home status page via `getStatusHtml()`
 - custom config page content via `getConfigHtml()`
-- validation and persistence of device-specific configuration in `saveConfig()`
+- validation and persistence of device-specific settings in `saveConfig()`
 - custom `begin()` and `update()` logic for sensor polling, actuator control, timers, etc.
 
 Those are the methods that must be overridden in a derived module.
@@ -132,7 +132,7 @@ FeederModule module(display, config, alert, httpServer, timeSync);
 
 ## 6) Example: an aquamonitor module
 
-The aquamonitor is similar in architecture, but its status and configuration are focused on water monitoring.
+The aquamonitor is similar in architecture, but its status and settings are focused on water monitoring.
 
 ```cpp
 class AquaMonitorModule : public GenericModule {

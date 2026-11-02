@@ -23,9 +23,9 @@ static const char HOME_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Aqua Monitor</title><link rel="stylesheet" href="/style.css"></head>
 <body>
-<nav><a href="/config">Configuration</a> | <a href="/module/config">Module configuration</a></nav>
+<nav><a href="/module/config">Module settings</a> | <a href="/config">Other Settings</a></nav>
 <h1 id="name">...</h1>
-<div id="relay" class="alert" hidden>SmsRelay not found: alerts cannot be sent. Check the <a href="/config">configuration</a>.</div>
+<div id="relay" class="alert" hidden>SmsRelay not found: alerts cannot be sent. Check the <a href="/config">settings</a>.</div>
 <table>
 <!--MODULE_STATUS-->
 <tr><td>Module time</td><td id="time">-</td></tr>
@@ -68,20 +68,20 @@ setInterval(showTime,1000);
 
 static const char MODULE_CONFIG_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Module configuration</title><link rel="stylesheet" href="/style.css"></head>
+<title>Module settings</title><link rel="stylesheet" href="/style.css"></head>
 <body>
-<nav><a href="/">Home</a> | <a href="/config">Configuration</a></nav>
-<h1>Module configuration</h1>
+<nav><a href="/">Home</a> | <a href="/config">Other Settings</a></nav>
+<h1>Module settings</h1>
 <!--MODULE_CONFIG-->
 </body></html>
 )rawliteral";
 
 static const char CONFIG_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Configuration</title><link rel="stylesheet" href="/style.css"></head>
+<title>Settings</title><link rel="stylesheet" href="/style.css"></head>
 <body>
-<nav><a href="/">Home</a> | <a href="/module/config">Module configuration</a></nav>
-<h1>Configuration</h1>
+<nav><a href="/">Home</a> | <a href="/module/config">Module settings</a></nav>
+<h1>Settings</h1>
 <form id="f">
 <label>Module name<input id="name" maxlength="10" required></label>
 <h2>Home network (STA)</h2>
@@ -90,6 +90,9 @@ static const char CONFIG_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
 <h2>Local network (AP)</h2>
 <label>SSID<input id="apSsid" maxlength="32"></label>
 <label>Password (8-63 characters)<input id="apPwd" type="password" maxlength="63" autocomplete="new-password" placeholder="leave blank to keep current"></label>
+<button type="submit">Save</button>
+<p id="msg"></p>
+</form>
 <h2>SmsRelay</h2>
 <div class="row">
 <label>IP address<input id="smsRelayIp" maxlength="15" inputmode="decimal" pattern="\d{1,3}(\.\d{1,3}){3}" placeholder="not found yet"></label>
@@ -97,9 +100,6 @@ static const char CONFIG_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
 <button type="button" id="scan">Scan</button>
 </div>
 <p id="smsg"></p>
-<button type="submit">Save</button>
-</form>
-<p id="msg"></p>
 <h2>Display</h2>
 <label><input id="flip" type="checkbox">Flip screen by 180°</label>
 <p id="dmsg"></p>
@@ -130,11 +130,11 @@ async function load(){
     if(d.smsRelayScanning)waitScan();
     $('gitHash').textContent=d.gitHash;
     $('buildTime').textContent=d.buildTime;
-  }catch(e){msg('Unable to load configuration: '+e.message,false);}
+  }catch(e){msg('Unable to load settings: '+e.message,false);}
 }
 $('f').addEventListener('submit',async e=>{
   e.preventDefault();
-  const body={name:$('name').value,homeSsid:$('homeSsid').value,apSsid:$('apSsid').value,smsRelayIp:$('smsRelayIp').value};
+  const body={name:$('name').value,homeSsid:$('homeSsid').value,apSsid:$('apSsid').value};
   if($('homePwd').value)body.homePwd=$('homePwd').value;
   if($('apPwd').value)body.apPwd=$('apPwd').value;
   try{
@@ -142,7 +142,7 @@ $('f').addEventListener('submit',async e=>{
     const d=await r.json();
     if(!r.ok)throw new Error(d.error||('HTTP '+r.status));
     $('homePwd').value='';$('apPwd').value='';
-    msg(d.reboot?'Saved. The module is rebooting to apply the WiFi settings; reconnect to the network afterwards.':d.smsRelayReachable===false?'Saved, but SmsRelay did not answer at this IP.':'Saved.',d.smsRelayReachable!==false);
+    msg(d.reboot?'Saved. The module is rebooting to apply the WiFi settings; reconnect to the network afterwards.':'Saved.',true);
   }catch(err){msg('Save failed: '+err.message,false);}
 });
 const sm=(t,ok)=>{$('smsg').textContent=t;$('smsg').className=ok?'ok':'nok';};
@@ -171,10 +171,10 @@ $('scan').addEventListener('click',async()=>{
 $('ping').addEventListener('click',async()=>{
   $('ping').disabled=true;sm('Pinging SmsRelay...',true);
   try{
-    const r=await fetch('/api/smsrelay/ping',{method:'POST'});
+    const r=await fetch('/api/smsrelay/ping',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({smsRelayIp:$('smsRelayIp').value})});
     const d=await r.json();
     if(!r.ok)throw new Error(d.error||('HTTP '+r.status));
-    if(d.reachable)sm('SmsRelay answered.',true);else sm('SmsRelay did not answer.',false);
+    if(d.reachable){sm('SmsRelay answered. IP saved.',true);}else sm('SmsRelay did not answer.',false);
   }catch(err){sm('Ping failed: '+err.message,false);}
   $('ping').disabled=false;
 });

@@ -183,7 +183,6 @@ class HttpServer {
     typesOk &= readString(doc, "apSsid", next.apSsid, present);
     typesOk &= readString(doc, "homePwd", next.homePwd, homePwdGiven);
     typesOk &= readString(doc, "apPwd", next.apPwd, apPwdGiven);
-    typesOk &= readString(doc, "smsRelayIp", next.smsRelayIp, present);
     if (!typesOk) {
       sendError(400, "All fields must be strings");
       return;
@@ -192,7 +191,6 @@ class HttpServer {
     next.name.trim();
     next.homeSsid.trim();
     next.apSsid.trim();
-    next.smsRelayIp.trim();
 
     // The page prefills the default AP SSID when none is stored; submitting it unchanged is a no-op.
     if (config_.apSsid.isEmpty() && !apPwdGiven && next.apSsid == ConfigDefaults::AP_SSID) {
@@ -219,11 +217,6 @@ class HttpServer {
       sendError(400, "A local password is required with a local SSID");
       return;
     }
-    IPAddress relayIp;
-    if (!next.smsRelayIp.isEmpty() && !relayIp.fromString(next.smsRelayIp)) {
-      sendError(400, "SmsRelay IP is not a valid IPv4 address");
-      return;
-    }
 
     // Clearing an SSID also clears its stored password.
     if (next.homeSsid.isEmpty()) next.homePwd = "";
@@ -234,19 +227,11 @@ class HttpServer {
 
     config_ = next;
     configStore_.save(config_);
-    // A manually entered IP wins over a running scan, and is always checked with /api/ping (even
-    // if unchanged, with long timeouts): the display warning follows the result (an empty IP
-    // clears a previous failure).
-    if (!next.smsRelayIp.isEmpty()) smsRelayScanner_.stop();
-    const bool relayChecked = !next.smsRelayIp.isEmpty() && SmsRelayScanner::isStaConnected();
-    const bool relayReachable =
-        smsRelayScanner_.verify(next.smsRelayIp, SmsRelayScanner::SAVE_CHECK_TIMEOUT_MS);
     display_.setTitle(config_.name);
 
     JsonDocument res;
     res["ok"] = true;
     res["reboot"] = wifiChanged;
-    if (relayChecked) res["smsRelayReachable"] = relayReachable;
     sendJson(200, res);
 
     if (wifiChanged) {
@@ -263,7 +248,7 @@ class HttpServer {
     }
     String error;
     if (module_ == nullptr || !module_->saveConfig(doc.as<JsonObjectConst>(), error)) {
-      sendError(400, error.isEmpty() ? "Module configuration rejected" : error.c_str());
+      sendError(400, error.isEmpty() ? "Module settings rejected" : error.c_str());
       return;
     }
     JsonDocument res;
@@ -305,21 +290,51 @@ class HttpServer {
     sendJson(202, res);
   }
 
-  // Pings the stored SmsRelay IP now (blocks for a few seconds) and reports whether it answered.
-  // The result also drives the warning shown on the screen.
+  // Pings the provided SmsRelay IP (blocks for a few seconds) and reports whether it answered.
+  // If successful, saves the IP to preferences.
   void handleSmsRelayPing() {
-    if (config_.smsRelayIp.isEmpty()) {
-      sendError(409, "No SmsRelay IP configured");
+    JsonDocument doc;
+    if (deserializeJson(doc, server_.arg("plain"))) {
+      sendError(400, "Invalid JSON");
       return;
     }
+
+    JsonVariantConst ipVar = doc["smsRelayIp"];
+    if (!ipVar.is<const char*>()) {
+      sendError(400, "smsRelayIp must be a string");
+      return;
+    }
+
+    String smsRelayIp = ipVar.as<const char*>();
+    smsRelayIp.trim();
+
+    if (smsRelayIp.isEmpty()) {
+      sendError(400, "SmsRelay IP cannot be empty");
+      return;
+    }
+
+    IPAddress relayIpAddr;
+    if (!relayIpAddr.fromString(smsRelayIp)) {
+      sendError(400, "SmsRelay IP is not a valid IPv4 address");
+      return;
+    }
+
     if (!SmsRelayScanner::isStaConnected()) {
       sendError(409, "Not connected to the home network");
       return;
     }
+
+    bool reachable = smsRelayScanner_.verify(smsRelayIp, SmsRelayScanner::SAVE_CHECK_TIMEOUT_MS);
+    
+    // If ping successful, save the IP
+    if (reachable) {
+      config_.smsRelayIp = smsRelayIp;
+      configStore_.saveSmsRelayIp(config_);
+    }
+
     JsonDocument res;
     res["ok"] = true;
-    res["reachable"] =
-        smsRelayScanner_.verify(config_.smsRelayIp, SmsRelayScanner::SAVE_CHECK_TIMEOUT_MS);
+    res["reachable"] = reachable;
     sendJson(200, res);
   }
 

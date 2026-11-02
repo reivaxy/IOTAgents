@@ -9,7 +9,7 @@
 #include "Config.h"
 
 // Sends alerts to the SmsRelay module: POSTs {"module": <module name>, "text": <message>}
-// as JSON on http://<SmsRelay IP>/api/alerte. The IP is read from the configuration at each
+// as JSON on http://<SmsRelay IP>/api/alerte. The IP is read from the settings at each
 // call. send() blocks for up to the connect + read timeouts.
 class Alert {
  public:

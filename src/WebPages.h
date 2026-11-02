@@ -89,8 +89,8 @@ static const char CONFIG_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
 <h2>SmsRelay</h2>
 <div class="row">
 <label>IP address<input id="smsRelayIp" maxlength="15" inputmode="decimal" pattern="\d{1,3}(\.\d{1,3}){3}" placeholder="not found yet"></label>
-<button type="button" id="scan">Scan</button>
 <button type="button" id="ping">Ping</button>
+<button type="button" id="scan">Scan</button>
 </div>
 <p id="smsg"></p>
 <button type="submit">Save</button>

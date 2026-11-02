@@ -60,6 +60,7 @@ class HttpServer {
     server_.on("/config", HTTP_GET, [this]() { server_.send(200, "text/html", CONFIG_PAGE); });
     server_.on("/style.css", HTTP_GET, [this]() { server_.send(200, "text/css", STYLE); });
     server_.on("/api/status", HTTP_GET, [this]() { handleStatus(); });
+    server_.on("/api/ping", HTTP_GET, [this]() { server_.send(200, "text/plain", config_.name); });
     server_.on("/api/config", HTTP_GET, [this]() { handleGetConfig(); });
     server_.on("/api/config", HTTP_POST, [this]() { handleSetConfig(); });
     server_.on("/api/display", HTTP_POST, [this]() { handleSetDisplay(); });

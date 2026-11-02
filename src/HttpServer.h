@@ -156,6 +156,15 @@ class HttpServer {
     return true;
   }
 
+  static bool readBool(const JsonDocument& doc, const char* key, bool& out, bool& present) {
+    JsonVariantConst v = doc[key];
+    present = !v.isNull();
+    if (!present) return true;
+    if (!v.is<bool>()) return false;
+    out = v.as<bool>();
+    return true;
+  }
+
   void handleSetConfig() {
     JsonDocument doc;
     if (deserializeJson(doc, server_.arg("plain"))) {

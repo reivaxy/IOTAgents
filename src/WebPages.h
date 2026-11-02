@@ -23,13 +23,11 @@ static const char HOME_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Aqua Monitor</title><link rel="stylesheet" href="/style.css"></head>
 <body>
-<nav><a href="/config">Configuration</a></nav>
+<nav><a href="/config">Configuration</a> | <a href="/module/config">Module configuration</a></nav>
 <h1 id="name">...</h1>
 <div id="relay" class="alert" hidden>SmsRelay not found: alerts cannot be sent. Check the <a href="/config">configuration</a>.</div>
 <table>
-<tr><td>Light</td><td id="light">-</td></tr>
-<tr><td>Temperature</td><td id="temp">-</td></tr>
-<tr><td>Water level</td><td id="water">-</td></tr>
+<!--MODULE_STATUS-->
 <tr><td>Module time</td><td id="time">-</td></tr>
 </table>
 <p id="err" class="nok"></p>
@@ -52,14 +50,10 @@ async function refresh(){
     const d=await r.json();
     document.getElementById('name').textContent=d.name;
     document.title=d.name;
-    document.getElementById('light').textContent=d.light?'ON':'OFF';
-    document.getElementById('temp').textContent=d.temperature.toFixed(1)+' \u00B0C';
-    const w=document.getElementById('water');
-    w.textContent=d.waterLevelOk?'OK':'NOK';
-    w.className=d.waterLevelOk?'ok':'nok';
     document.getElementById('relay').hidden=!d.smsRelayNotFound;
     baseEpoch=d.epoch;utcOffset=d.utcOffset||0;baseTick=performance.now();
     showTime();
+    if(typeof moduleStatus==='function')moduleStatus(d);
     document.getElementById('err').textContent='';
   }catch(e){
     document.getElementById('err').textContent='Unable to fetch values: '+e.message;
@@ -72,11 +66,21 @@ setInterval(showTime,1000);
 </body></html>
 )rawliteral";
 
+static const char MODULE_CONFIG_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Module configuration</title><link rel="stylesheet" href="/style.css"></head>
+<body>
+<nav><a href="/">Home</a> | <a href="/config">Configuration</a></nav>
+<h1>Module configuration</h1>
+<!--MODULE_CONFIG-->
+</body></html>
+)rawliteral";
+
 static const char CONFIG_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Configuration</title><link rel="stylesheet" href="/style.css"></head>
 <body>
-<nav><a href="/">Home</a></nav>
+<nav><a href="/">Home</a> | <a href="/module/config">Module configuration</a></nav>
 <h1>Configuration</h1>
 <form id="f">
 <label>Module name<input id="name" maxlength="10" required></label>

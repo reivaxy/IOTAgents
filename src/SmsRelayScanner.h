@@ -8,9 +8,10 @@
 
 #include "Alert.h"
 #include "Config.h"
+#include "GenericModule.h"
 
-#define IP_START 2
-#define IP_END 253
+#define IP_START 140
+#define IP_END 150
 
 // Finds the SmsRelay module on the home network (/24 subnet of this module) by calling
 // /api/ping (POST, JSON {"IP", "name"}) on x.x.x.0 .. x.x.x.255 until the answer is "SmsRelay", then stores the IP.
@@ -24,10 +25,11 @@ class SmsRelayScanner {
   static constexpr uint32_t SAVE_CHECK_TIMEOUT_MS = 10000;  // connect and read, check on config save
   static constexpr uint32_t PING_INTERVAL_MS = 10UL * 60 * 1000;
 
-  void begin(Config& config, ConfigStore& store, Alert& alert) {
+  void begin(Config& config, ConfigStore& store, Alert& alert, const GenericModule& module) {
     config_ = &config;
     store_ = &store;
     alert_ = &alert;
+    module_ = &module;
   }
 
   // Starts (or restarts) a scan. Returns false if not connected to the home network.
@@ -151,6 +153,7 @@ class SmsRelayScanner {
   Config* config_ = nullptr;
   ConfigStore* store_ = nullptr;
   Alert* alert_ = nullptr;
+  const GenericModule* module_ = nullptr;
   bool autoChecked_ = false;
   bool scanning_ = false;
   bool manualCheckFailed_ = false;
@@ -182,11 +185,11 @@ class SmsRelayScanner {
 
   bool probe(const String& url, uint32_t timeoutMs) {
     // The ping tells SmsRelay who is calling:
-    // {"IP": <this module IP>, "name": <module name>, "type": "aquamonitor"}.
+    // {"IP": <this module IP>, "name": <module name>, "type": <module type>}.
     JsonDocument doc;
     doc["IP"] = WiFi.localIP().toString();
     doc["name"] = config_->name;
-    doc["type"] = "aquamonitor";
+    doc["type"] = module_ != nullptr ? module_->getType() : "generic";
     String payload;
     serializeJson(doc, payload);
     Serial.printf("  ping POST %s %s\n", url.c_str(), payload.c_str());

@@ -4,8 +4,8 @@
 #include "Alert.h"
 #include "Config.h"
 #include "Display.h"
+#include "GenericModule.h"
 #include "HttpServer.h"
-#include "Sensor.h"
 #include "SmsRelayScanner.h"
 #include "TimeSync.h"
 
@@ -15,7 +15,6 @@ constexpr uint32_t QR_DURATION_MS = 20000;
 
 ConfigStore configStore;
 Config config;
-Sensor sensor;
 TimeSync timeSync;
 Display display;
 Alert alert;
@@ -27,8 +26,10 @@ void scheduleReboot() {
   if (rebootAt == 0) rebootAt = 1;
 }
 
-HttpServer httpServer(config, configStore, sensor, timeSync, display, smsRelayScanner,
-                      scheduleReboot);
+HttpServer httpServer(config, configStore, timeSync, display, smsRelayScanner, scheduleReboot);
+
+// Replace GenericModule by the class of the actual device module.
+GenericModule module(display, config, alert, httpServer, timeSync);
 
 // ---------------------------------------------------------------- WiFi
 
@@ -94,10 +95,11 @@ void setup() {
 
   timeSync.begin(config, configStore);
   alert.begin(config);
-  smsRelayScanner.begin(config, configStore, alert);
-  sensor.begin();
+  smsRelayScanner.begin(config, configStore, alert, module);
+  module.begin();
   startWifi();
 
+  httpServer.setModule(module);
   httpServer.begin();
 
   const IPAddress ip = WiFi.getMode() == WIFI_AP ? WiFi.softAPIP() : WiFi.localIP();
@@ -108,6 +110,7 @@ void loop() {
   httpServer.handleClient();
   timeSync.update();
   smsRelayScanner.update();
+  module.update();
   display.update(timeSync, smsRelayScanner.isNotFound());
   display.refresh();
 

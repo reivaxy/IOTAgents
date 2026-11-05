@@ -120,6 +120,7 @@ class HttpServer {
   void handleStatus() {
     JsonDocument doc = module_ ? module_->getStatus() : JsonDocument();
     doc["name"] = config_.name;
+    doc["type"] = module_ ? module_->getType() : "generic";
     doc["smsRelayNotFound"] = smsRelayScanner_.isNotFound();
     doc["smsRelayIp"] = config_.smsRelayIp;
     if (timeSync_.isSynced()) {

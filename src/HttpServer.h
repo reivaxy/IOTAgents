@@ -118,7 +118,11 @@ class HttpServer {
   }
 
   void handleStatus() {
-    JsonDocument doc = module_ ? module_->getStatus() : JsonDocument();
+    JsonDocument doc;
+    if (module_ != nullptr) {
+      JsonDocument moduleStatus = module_->getStatus();
+      doc["module"].set(moduleStatus.as<JsonVariantConst>());
+    }
     doc["name"] = config_.name;
     doc["type"] = module_ ? module_->getType() : "generic";
     doc["smsRelayNotFound"] = smsRelayScanner_.isNotFound();

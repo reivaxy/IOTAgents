@@ -2,8 +2,8 @@
 
 This project is built around a shared base class, `GenericModule`, and a set of device-specific implementations. The idea is:
 
-- common infrastructure stays in the main project
-- each device type (for example, `feeder` and `aquamonitor`) gets its own branch or module class
+- common infrastructure stays in the `main` branch
+- each device type (for example, `feeder` and `aquamonitor`) gets its own branch and module class overriding the GenericModule class.
 - only the device-specific behavior is overridden
 
 The base contract is defined in `src/GenericModule.h`.
@@ -21,7 +21,7 @@ The following parts are shared by every device:
 - generic pages and generic REST endpoints
 - the common module entry point created in `src/main.cpp`
 
-This is the part that should remain stable across branches. In other words, if a change is needed for the platform itself, it is usually made once in the shared code and then reused by every device.
+This is the part that should remain stable across branches. In other words, if a change is needed for the platform itself, it is usually made once in the shared code (`main` branch) and then reused by every device.
 
 ## 2) What is specific to each module
 
@@ -201,8 +201,8 @@ This keeps each product branch focused and avoids mixing feeder logic with aquam
 
 ## 9) Practical rule
 
-If the functionality is shared by all devices, put it in the common project code.
+If the functionality is shared by all devices, put it in the common project code (`main` branch)
 
-If the functionality belongs only to one product, override it in the module subclass for that branch.
+If the functionality belongs only to one product, override it in the module subclass for that product branch.
 
 That is the core of this architecture.

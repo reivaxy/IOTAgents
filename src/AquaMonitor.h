@@ -2,6 +2,8 @@
 
 #include <Arduino.h>
 #include <ArduinoJson.h>
+#include <DallasTemperature.h>
+#include <OneWire.h>
 #include <Preferences.h>
 
 #include "GenericModule.h"
@@ -79,10 +81,12 @@ class AquaMonitor : public GenericModule {
       : GenericModule(display, config, alert, httpServer, timeSync),
         store_(),
         config_(store_.load()),
-        temperature_(24.5),  // dummy value
-        lightOn_(false),     // dummy value
-        waterLevelOk_(true)  // dummy value
-  {}
+        oneWire_(TEMPERATURE_PIN),
+        sensors_(&oneWire_),
+        temperature_(NAN),  // NAN until the first valid reading
+        lightLevel_(0),
+        lightOn_(false),
+        waterLevelOk_(false) {}
 
   const char* getType() const override { return "aquamonitor"; }
 
@@ -90,16 +94,71 @@ class AquaMonitor : public GenericModule {
     // Register the module configuration API endpoint
     httpServer_.webServer().on("/api/module/config", HTTP_GET,
                                 [this]() { handleGetModuleConfig(); });
+
+    // Water level switch: pulled up, the switch connects the pin to ground
+    pinMode(WATER_LEVEL_PIN, INPUT_PULLUP);
+
+    // Light sensor: photoresistor on an ADC1 pin (ADC2 is unusable while WiFi is on)
+    pinMode(LIGHT_PIN, INPUT);
+    analogReadResolution(12);
+
+    // Temperature probe: do not block while the conversion is running
+    sensors_.begin();
+    sensors_.setWaitForConversion(false);
+    sensors_.setResolution(TEMPERATURE_RESOLUTION);
+
+    // Take a first measure as soon as update() is called
+    lastWaterLevelRead_ = lastLightRead_ = lastTemperatureRequest_ = millis() - READ_PERIOD_MS;
   }
 
+  // Each value is refreshed every READ_PERIOD_MS
   void update() override {
-    // This is where sensor readings would be integrated
-    // For now, dummy values are used
+    const uint32_t now = millis();
+
+    if (now - lastWaterLevelRead_ >= READ_PERIOD_MS) {
+      lastWaterLevelRead_ = now;
+      const int raw = digitalRead(WATER_LEVEL_PIN);
+      waterLevelOk_ = (raw == WATER_LEVEL_OK_STATE);
+      Serial.printf("AquaMonitor water level: pin %d -> %s\n", raw, waterLevelOk_ ? "OK" : "NOK");
+    }
+
+    if (now - lastLightRead_ >= READ_PERIOD_MS) {
+      lastLightRead_ = now;
+      lightLevel_ = analogRead(LIGHT_PIN);
+      lightOn_ = (lightLevel_ >= LIGHT_ON_THRESHOLD);
+      Serial.printf("AquaMonitor light: raw %d (threshold %d) -> %s\n", lightLevel_,
+                    LIGHT_ON_THRESHOLD, lightOn_ ? "ON" : "OFF");
+    }
+
+    // Temperature is read in 2 steps: request a conversion, then read the result
+    // once it is complete (up to 750ms), without blocking the loop.
+    if (!temperatureRequested_) {
+      if (now - lastTemperatureRequest_ >= READ_PERIOD_MS) {
+        lastTemperatureRequest_ = now;
+        sensors_.requestTemperatures();
+        temperatureRequested_ = true;
+        Serial.println("AquaMonitor temperature: conversion requested");
+      }
+    } else if (sensors_.isConversionComplete()) {
+      temperatureRequested_ = false;
+      float t = sensors_.getTempCByIndex(0);
+      temperature_ = (t == DEVICE_DISCONNECTED_C) ? NAN : t;
+      if (isnan(temperature_)) {
+        Serial.println("AquaMonitor temperature: probe not found or read error");
+      } else {
+        Serial.printf("AquaMonitor temperature: %.2f C\n", temperature_);
+      }
+    }
   }
 
   JsonDocument getStatus() override {
     JsonDocument doc;
-    doc["temperature"] = temperature_;
+    if (isnan(temperature_)) {
+      doc["temperature"] = nullptr;
+    } else {
+      doc["temperature"] = temperature_;
+    }
+    doc["lightLevel"] = lightLevel_;
     doc["lightOn"] = lightOn_;
     doc["waterLevelOk"] = waterLevelOk_;
     return doc;
@@ -113,12 +172,14 @@ class AquaMonitor : public GenericModule {
     html += "<script>\n";
     html += "function moduleStatus(d) {\n";
     html += "  const temp = document.getElementById('temp');\n";
-    html += "  temp.textContent = d.temperature.toFixed(1) + '°C';\n";
     html += "  const tmin = " + String(config_.tempMin) + ";\n";
     html += "  const tmax = " + String(config_.tempMax) + ";\n";
-    html += "  if (d.temperature < tmin) temp.className = 'nok';\n";
-    html += "  else if (d.temperature > tmax) temp.className = 'nok';\n";
-    html += "  else temp.className = 'ok';\n";
+    html += "  if (d.temperature === null) { temp.textContent = 'N/A'; temp.className = 'nok'; }\n";
+    html += "  else {\n";
+    html += "    temp.textContent = d.temperature.toFixed(1) + '°C';\n";
+    html += "    if (d.temperature < tmin || d.temperature > tmax) temp.className = 'nok';\n";
+    html += "    else temp.className = 'ok';\n";
+    html += "  }\n";
     html += "\n";
     html += "  const light = document.getElementById('light');\n";
     html += "  light.textContent = d.lightOn ? 'ON' : 'OFF';\n";
@@ -262,11 +323,30 @@ class AquaMonitor : public GenericModule {
     httpServer_.sendJson(200, doc);
   }
 
+  // GPIO assignment
+  static constexpr uint8_t WATER_LEVEL_PIN = 25;  // digital, level switch
+  static constexpr uint8_t LIGHT_PIN = 34;        // analog (ADC1), photoresistor
+  static constexpr uint8_t TEMPERATURE_PIN = 4;   // OneWire, temperature probe
+
+  static constexpr uint32_t READ_PERIOD_MS = 5000;
+  static constexpr uint8_t WATER_LEVEL_OK_STATE = HIGH;  // pin state when water level is ok
+  static constexpr int LIGHT_ON_THRESHOLD = 1000;  // raw ADC value (0-4095) above which light is on
+  static constexpr uint8_t TEMPERATURE_RESOLUTION = 12;  // bits
+
   AquaMonitorStore store_;
   AquaMonitorConfig config_;
 
-  // Status variables (will be populated from sensors)
+  OneWire oneWire_;
+  DallasTemperature sensors_;
+
+  // Status variables, refreshed by update()
   float temperature_;
+  int lightLevel_;
   bool lightOn_;
   bool waterLevelOk_;
+
+  uint32_t lastWaterLevelRead_ = 0;
+  uint32_t lastLightRead_ = 0;
+  uint32_t lastTemperatureRequest_ = 0;
+  bool temperatureRequested_ = false;
 };

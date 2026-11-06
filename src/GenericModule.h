@@ -18,8 +18,8 @@ class HttpServer;  // include "HttpServer.h" in the module implementation to use
 // HTML fragment contracts (the fragments are inserted as is into the generic pages):
 //
 // getStatusHtml(): `<tr><td>Label</td><td id="x">-</td></tr>` rows added to the home page status
-//   table, optionally followed by a <script> defining `function moduleStatus(d){...}`. It is
-//   called with the /api/status JSON after every refresh (typically to fill the cells).
+//   table, optionally followed by a <script> defining `function moduleStatus(module){...}`. It is
+//   called with the `module` object from /api/status after every refresh (typically to fill cells).
 //
 // getConfigHtml(): free HTML (a heading and a <form> for instance) displayed in the module
 //   settings page (/module/config, linked from the home and settings pages). It renders
@@ -48,8 +48,7 @@ class GenericModule {
   // Called from loop().
   virtual void update() {}
 
-  // Module-specific part of the /api/status answer. The HTTP server adds the generic fields
-  // (name, SmsRelay state, time) to it.
+  // Module-specific fields nested under "module" in the /api/status answer.
   virtual JsonDocument getStatus() {
     JsonDocument doc;
     doc["message"] = "override the getStatus method";

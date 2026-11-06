@@ -53,7 +53,7 @@ async function refresh(){
     document.getElementById('relay').hidden=!d.smsRelayNotFound;
     baseEpoch=d.epoch;utcOffset=d.utcOffset||0;baseTick=performance.now();
     showTime();
-    if(typeof moduleStatus==='function')moduleStatus(d);
+    if(typeof moduleStatus==='function')moduleStatus(d.module);
     document.getElementById('err').textContent='';
   }catch(e){
     document.getElementById('err').textContent='Unable to fetch values: '+e.message;

@@ -28,7 +28,7 @@ This is the part that should remain stable across branches. In other words, if a
 Each module is different in behavior and UI. Typical per-module logic includes:
 
 - the device type name, such as `feeder` or `aquamonitor`
-- custom status data returned by `getStatus()`
+- custom status data returned by `getStatus()` under the `module` object in `/api/status`
 - custom rows / script injected on the home status page via `getStatusHtml()`
 - custom config page content via `getConfigHtml()`
 - validation and persistence of device-specific settings in `saveConfig()`
@@ -110,8 +110,8 @@ class FeederModule : public GenericModule {
     return R"(
       <tr><td>Feeder</td><td id="feederStatus">-</td></tr>
       <script>
-        function moduleStatus(d) {
-          document.getElementById("feederStatus").innerText = d.feedingEnabled ? "ON" : "OFF";
+        function moduleStatus(module) {
+          document.getElementById("feederStatus").innerText = module.feedingEnabled ? "ON" : "OFF";
         }
       </script>
     )";

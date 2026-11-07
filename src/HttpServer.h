@@ -94,6 +94,7 @@ class HttpServer {
     server_.on("/api/config", HTTP_POST, [this]() { handleSetConfig(); });
     server_.on("/api/module/config", HTTP_POST, [this]() { handleSetModuleConfig(); });
     server_.on("/api/display", HTTP_POST, [this]() { handleSetDisplay(); });
+    server_.on("/api/restart", HTTP_POST, [this]() { handleRestart(); });
     server_.on("/api/smsrelay/scan", HTTP_POST, [this]() { handleSmsRelayScan(); });
     server_.on("/api/smsrelay/ping", HTTP_POST, [this]() { handleSmsRelayPing(); });
     server_.on(
@@ -281,6 +282,14 @@ class HttpServer {
     JsonDocument res;
     res["ok"] = true;
     sendJson(200, res);
+  }
+
+  void handleRestart() {
+    JsonDocument res;
+    res["ok"] = true;
+    res["reboot"] = true;
+    sendJson(200, res);
+    scheduleReboot_();
   }
 
   // Forces a new SmsRelay scan; it runs in the background from loop() and updates the stored IP.

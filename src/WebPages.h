@@ -23,9 +23,9 @@ static const char HOME_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Aqua Monitor</title><link rel="stylesheet" href="/style.css"></head>
 <body>
-<nav><a href="/module/config">Module settings</a> | <a href="/config">Other Settings</a></nav>
+<nav><a href="/module/config">Module settings</a> | <a href="/config">Generic Settings</a></nav>
 <h1 id="name">...</h1>
-<div id="relay" class="alert" hidden>SmsRelay not found: alerts cannot be sent. Check the <a href="/config">settings</a>.</div>
+<div id="relay" class="alert" hidden>SmsRelay not found: alerts cannot be sent. Check the <a href="/config">Generic Settings</a>.</div>
 <table>
 <!--MODULE_STATUS-->
 <tr><td>Module time</td><td id="time">-</td></tr>
@@ -70,7 +70,7 @@ static const char MODULE_CONFIG_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Module settings</title><link rel="stylesheet" href="/style.css"></head>
 <body>
-<nav><a href="/">Home</a> | <a href="/config">Other Settings</a></nav>
+<nav><a href="/">Home</a> | <a href="/config">Generic Settings</a></nav>
 <h1>Module settings</h1>
 <!--MODULE_CONFIG-->
 </body></html>
@@ -78,10 +78,10 @@ static const char MODULE_CONFIG_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
 
 static const char CONFIG_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Settings</title><link rel="stylesheet" href="/style.css"></head>
+<title>Generic Settings</title><link rel="stylesheet" href="/style.css"></head>
 <body>
 <nav><a href="/">Home</a> | <a href="/module/config">Module settings</a></nav>
-<h1>Settings</h1>
+<h1>Generic Settings</h1>
 <form id="f">
 <label>Module name<input id="name" maxlength="10" required></label>
 <h2>Home network (STA)</h2>
@@ -114,6 +114,9 @@ static const char CONFIG_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
 <progress id="up" value="0" max="100" hidden></progress>
 </form>
 <p id="umsg"></p>
+<h2>Device</h2>
+<button id="restart" type="button">Restart device</button>
+<p id="rmsg"></p>
 <script>
 const $=id=>document.getElementById(id);
 const msg=(t,ok)=>{$('msg').textContent=t;$('msg').className=ok?'ok':'nok';};
@@ -207,6 +210,19 @@ $('u').addEventListener('submit',e=>{
   xhr.onerror=()=>{$('ub').disabled=false;um('Update failed: connection error',false);};
   $('ub').disabled=true;$('up').hidden=false;$('up').value=0;um('Uploading...',true);
   xhr.send(fd);
+});
+$('restart').addEventListener('click',async()=>{
+  if(!confirm('Restart this device?'))return;
+  $('restart').disabled=true;
+  try{
+    const r=await fetch('/api/restart',{method:'POST'});
+    const d=await r.json();
+    if(!r.ok)throw new Error(d.error||('HTTP '+r.status));
+    $('rmsg').textContent='The device is restarting.';
+  }catch(err){
+    $('restart').disabled=false;
+    $('rmsg').textContent='Restart failed: '+err.message;
+  }
 });
 </script>
 </body></html>

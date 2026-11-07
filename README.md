@@ -133,6 +133,34 @@ FeederModule module(display, config, alert, httpServer, timeSync);
 ## 6) Example: an aquamonitor module
 
 The aquamonitor is similar in architecture, but its status and settings are focused on water monitoring.
+It can monitor water temperature, pH, and level, and expose readings and alert thresholds through its
+status and configuration pages.
+
+The diagram below is an example wiring plan, not a pin map implemented by this repository: the current
+`AquaMonitorModule` snippet is illustrative and does not read sensors. Adapt the pins and supply
+connections to the modules you use. ESP32 GPIO34 and GPIO35 are input-only ADC pins; keep analog
+sensor outputs within 0–3.3 V and connect all grounds together.
+
+```mermaid
+flowchart LR
+  esp["ESP32 DevKit"]
+  temp["DS18B20 temperature sensor"]
+  ph["pH interface board"]
+  level["Analog water-level sensor"]
+  vcc["3.3 V"]
+  gnd["GND"]
+
+  esp -- "GPIO4 / data" --> temp
+  vcc -- "VDD; 4.7 kΩ pull-up from data to 3.3 V" --> temp
+  ph -- "analog out to GPIO34 / ADC input" --> esp
+  level -- "analog signal to GPIO35 / ADC input" --> esp
+  vcc -- "sensor supply, if supported" --> ph
+  vcc -- "sensor supply, if supported" --> level
+  gnd --- temp
+  gnd --- ph
+  gnd --- level
+  esp --- gnd
+```
 
 ```cpp
 class AquaMonitorModule : public GenericModule {

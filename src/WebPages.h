@@ -2,29 +2,58 @@
 
 #include <Arduino.h>
 
+// Stylesheet shared by all the pages (served as /style.css)
 static const char STYLE[] PROGMEM = R"rawliteral(
-body{font-family:sans-serif;max-width:480px;margin:2em auto;padding:0 1em}
-nav{margin-bottom:1em}
-table{width:100%;border-collapse:collapse}
-td{padding:.5em;border-bottom:1px solid #ddd}
-td:last-child{text-align:right;font-weight:bold}
-label{display:block;margin-top:.8em}
-input{width:100%;box-sizing:border-box;padding:.4em}
-input[type=checkbox]{width:auto;margin-right:.5em}
-button{margin-top:1em;padding:.5em 1em}
-.ok{color:green}.nok{color:red}
-.row{display:flex;gap:.5em;align-items:flex-end}
+body{font-family:Arial,sans-serif;max-width:600px;margin:5px auto;padding:5px;background:#f5f5f5;color:#333}
+.container{background:#fff;padding:10px 12px;border-radius:8px;box-shadow:0 2px 4px rgba(0,0,0,.1)}
+a{color:#007bff;text-decoration:none}
+a:hover{text-decoration:underline}
+h1{color:#333;text-align:center;margin:0 0 8px 0;font-size:22px}
+h2{margin:12px 0 4px 0;padding:6px 8px;border-left:4px solid #007bff;background:#f8f9fa;color:#007bff;font-size:14px}
+nav{display:flex;justify-content:center;gap:16px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #eee;font-size:13px}
+nav span{color:#666}
+table{width:100%;border-collapse:collapse;font-size:13px;background:#fff}
+td{padding:6px 4px;border-bottom:1px solid #eee}
+td:last-child{text-align:right;font-weight:bold;font-family:monospace}
+label{display:block;margin-top:6px;margin-bottom:2px;font-weight:bold;font-size:12px;color:#333}
+input{width:100%;box-sizing:border-box;padding:6px;border:1px solid #ddd;border-radius:4px;font-size:14px}
+input:focus{outline:none;border-color:#007bff}
+.check-row{display:flex;align-items:center;font-weight:normal;font-size:14px}
+.check-row input,input[type=checkbox]{width:auto;margin:0 8px 0 0}
+button{display:block;width:auto;margin:10px auto 0;padding:8px 16px;background:#007bff;color:#fff;border:none;border-radius:4px;font-size:14px;cursor:pointer}
+button:hover{background:#0056b3}
+button:disabled{background:#9bbfe8;cursor:not-allowed}
+button.danger{background:#dc3545}
+button.danger:hover{background:#b02a37}
+progress{width:100%;margin-top:8px}
+p{margin:6px 0;font-size:12px;min-height:1em}
+.ok{color:#155724}.nok{color:#721c24}
+p.ok,p.nok{padding:6px;border-radius:4px}
+p.ok:not(:empty){background:#d4edda;border:1px solid #c3e6cb}
+p.nok:not(:empty){background:#f8d7da;border:1px solid #f5c6cb}
+.row{display:flex;gap:6px;align-items:flex-end}
 .row label{flex:1}
-.row button{margin-top:0}
-.alert{background:#fdecea;color:#b71c1c;border:1px solid #f5c6cb;padding:.6em;margin-bottom:1em;border-radius:4px}
+.row button{margin:0;padding:7px 14px}
+.alert{background:#fff5f5;color:#dc3545;border:1px solid #f5c6cb;border-left:4px solid #dc3545;padding:8px;margin-bottom:10px;border-radius:4px;font-size:13px}
+.alert[hidden]{display:none}
 )rawliteral";
+
+// Navigation shared by all the pages: same items in the same order everywhere. Each page uses the
+// plain-text variant (*_HERE) for its own entry and the link variant (*_LINK) for the others.
+#define NAV_HOME_LINK "<a href=\"/\">Home</a>"
+#define NAV_MODULE_LINK "<a href=\"/module/config\">Module settings</a>"
+#define NAV_CONFIG_LINK "<a href=\"/config\">Generic Settings</a>"
+#define NAV_HOME_HERE "<span>Home</span>"
+#define NAV_MODULE_HERE "<span>Module settings</span>"
+#define NAV_CONFIG_HERE "<span>Generic Settings</span>"
 
 static const char HOME_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Aqua Monitor</title><link rel="stylesheet" href="/style.css"></head>
-<body>
-<nav><a href="/module/config">Module settings</a> | <a href="/config">Generic Settings</a></nav>
-<h1 id="name">...</h1>
+<body><div class="container">
+)rawliteral"
+    "<nav>" NAV_HOME_HERE NAV_MODULE_LINK NAV_CONFIG_LINK "</nav>\n"
+    R"rawliteral(<h1 id="name">...</h1>
 <div id="relay" class="alert" hidden>SmsRelay not found: alerts cannot be sent. Check the <a href="/config">Generic Settings</a>.</div>
 <table>
 <!--MODULE_STATUS-->
@@ -63,26 +92,29 @@ refresh();
 setInterval(refresh,REFRESH_MS);
 setInterval(showTime,1000);
 </script>
-</body></html>
+</div></body></html>
 )rawliteral";
 
 static const char MODULE_CONFIG_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Module settings</title><link rel="stylesheet" href="/style.css"></head>
-<body>
-<nav><a href="/">Home</a> | <a href="/config">Generic Settings</a></nav>
-<h1>Module settings</h1>
+<body><div class="container">
+)rawliteral"
+    "<nav>" NAV_HOME_LINK NAV_MODULE_HERE NAV_CONFIG_LINK "</nav>\n"
+    R"rawliteral(<h1>Module settings</h1>
 <!--MODULE_CONFIG-->
-</body></html>
+</div></body></html>
 )rawliteral";
 
 static const char CONFIG_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Generic Settings</title><link rel="stylesheet" href="/style.css"></head>
-<body>
-<nav><a href="/">Home</a> | <a href="/module/config">Module settings</a></nav>
-<h1>Generic Settings</h1>
+<body><div class="container">
+)rawliteral"
+    "<nav>" NAV_HOME_LINK NAV_MODULE_LINK NAV_CONFIG_HERE "</nav>\n"
+    R"rawliteral(<h1>Generic Settings</h1>
 <form id="f">
+<h2>Module</h2>
 <label>Module name<input id="name" maxlength="10" required></label>
 <h2>Home network (STA)</h2>
 <label>SSID<input id="homeSsid" maxlength="32"></label>
@@ -101,7 +133,7 @@ static const char CONFIG_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
 </div>
 <p id="smsg"></p>
 <h2>Display</h2>
-<label><input id="flip" type="checkbox">Flip screen by 180°</label>
+<label class="check-row"><input id="flip" type="checkbox">Flip screen by 180°</label>
 <p id="dmsg"></p>
 <h2>Firmware</h2>
 <table>
@@ -115,7 +147,7 @@ static const char CONFIG_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
 </form>
 <p id="umsg"></p>
 <h2>Device</h2>
-<button id="restart" type="button">Restart device</button>
+<button id="restart" type="button" class="danger">Restart device</button>
 <p id="rmsg"></p>
 <script>
 const $=id=>document.getElementById(id);
@@ -225,5 +257,5 @@ $('restart').addEventListener('click',async()=>{
   }
 });
 </script>
-</body></html>
+</div></body></html>
 )rawliteral";

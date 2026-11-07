@@ -27,7 +27,7 @@ button.danger{background:#dc3545}
 button.danger:hover{background:#b02a37}
 progress{width:100%;margin-top:8px}
 p{margin:6px 0;font-size:12px;min-height:1em}
-.ok{color:#155724}.nok{color:#721c24}
+.ok{color:#155724}.nok{color:#FF0000}
 p.ok,p.nok{padding:6px;border-radius:4px}
 p.ok:not(:empty){background:#d4edda;border:1px solid #c3e6cb}
 p.nok:not(:empty){background:#f8d7da;border:1px solid #f5c6cb}

@@ -82,7 +82,7 @@ class AquaMonitor : public GenericModule {
         store_(),
         config_(store_.load()),
         oneWire_(TEMPERATURE_PIN),
-        sensors_(&oneWire_),
+        tempSensor_(&oneWire_),
         temperature_(NAN),  // NAN until the first valid reading
         lightLevel_(0),
         lightOn_(false),
@@ -103,9 +103,9 @@ class AquaMonitor : public GenericModule {
     analogReadResolution(12);
 
     // Temperature probe: do not block while the conversion is running
-    sensors_.begin();
-    sensors_.setWaitForConversion(false);
-    sensors_.setResolution(TEMPERATURE_RESOLUTION);
+    tempSensor_.begin();
+    tempSensor_.setWaitForConversion(false);
+    findTemperatureProbe();
 
     // Take a first measure as soon as update() is called
     lastWaterLevelRead_ = lastLightRead_ = lastTemperatureRequest_ = millis() - READ_PERIOD_MS;
@@ -135,13 +135,18 @@ class AquaMonitor : public GenericModule {
     if (!temperatureRequested_) {
       if (now - lastTemperatureRequest_ >= READ_PERIOD_MS) {
         lastTemperatureRequest_ = now;
-        sensors_.requestTemperatures();
+        // Retry the probe detection until it is found (wiring fixed, probe plugged later...)
+        if (!tempProbeFound_ && !findTemperatureProbe()) {
+          temperature_ = NAN;
+          return;
+        }
+        tempSensor_.requestTemperaturesByAddress(tempAddr_);
         temperatureRequested_ = true;
         Serial.println("AquaMonitor temperature: conversion requested");
       }
-    } else if (sensors_.isConversionComplete()) {
+    } else if (tempSensor_.isConversionComplete()) {
       temperatureRequested_ = false;
-      float t = sensors_.getTempCByIndex(0);
+      float t = tempSensor_.getTempC(tempAddr_);
       temperature_ = (t == DEVICE_DISCONNECTED_C) ? NAN : t;
       if (isnan(temperature_)) {
         Serial.println("AquaMonitor temperature: probe not found or read error");
@@ -149,6 +154,10 @@ class AquaMonitor : public GenericModule {
         Serial.printf("AquaMonitor temperature: %.2f C\n", temperature_);
       }
     }
+
+    // if (now - lastTemperatureRequest_ >= READ_PERIOD_MS) {
+    //   lastTemperatureRequest_ = now;
+    // }
   }
 
   JsonDocument getStatus() override {
@@ -308,6 +317,34 @@ class AquaMonitor : public GenericModule {
   }
 
  private:
+  // Look for a DS18B20 on the OneWire bus. Returns true when found.
+  bool findTemperatureProbe() {
+    tempProbeFound_ = false;
+
+    // reset() returns 1 only if a device answers with a presence pulse
+    if (!oneWire_.reset()) {
+      Serial.printf(
+          "AquaMonitor temperature: no presence pulse on GPIO %d "
+          "(check wiring, 3.3V power and the 4.7k pull-up between DATA and 3.3V)\n",
+          TEMPERATURE_PIN);
+      return false;
+    }
+
+    tempSensor_.begin();  // re-enumerate the bus
+    if (!tempSensor_.getAddress(tempAddr_, 0)) {
+      Serial.println("AquaMonitor temperature probe not found (device present but not a DS18B20?)");
+      return false;
+    }
+
+    tempSensor_.setResolution(tempAddr_, TEMPERATURE_RESOLUTION);
+    tempSensor_.setWaitForConversion(false);
+    tempProbeFound_ = true;
+    Serial.printf("AquaMonitor temperature probe found: %02X%02X%02X%02X%02X%02X%02X%02X\n",
+                  tempAddr_[0], tempAddr_[1], tempAddr_[2], tempAddr_[3], tempAddr_[4],
+                  tempAddr_[5], tempAddr_[6], tempAddr_[7]);
+    return true;
+  }
+
   void handleGetModuleConfig() {
     JsonDocument doc;
     doc["light1OnStart"] = config_.light1OnStart;
@@ -337,7 +374,7 @@ class AquaMonitor : public GenericModule {
   AquaMonitorConfig config_;
 
   OneWire oneWire_;
-  DallasTemperature sensors_;
+  DallasTemperature tempSensor_;
 
   // Status variables, refreshed by update()
   float temperature_;
@@ -349,4 +386,6 @@ class AquaMonitor : public GenericModule {
   uint32_t lastLightRead_ = 0;
   uint32_t lastTemperatureRequest_ = 0;
   bool temperatureRequested_ = false;
+  DeviceAddress tempAddr_ = {0};
+  bool tempProbeFound_ = false;
 };

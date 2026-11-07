@@ -8,7 +8,8 @@ body{font-family:Arial,sans-serif;max-width:600px;margin:5px auto;padding:5px;ba
 .container{background:#fff;padding:10px 12px;border-radius:8px;box-shadow:0 2px 4px rgba(0,0,0,.1)}
 a{color:#007bff;text-decoration:none}
 a:hover{text-decoration:underline}
-h1{color:#333;text-align:center;margin:0 0 8px 0;font-size:22px}
+h1{color:#333;text-align:center;margin:0 0 2px 0;font-size:22px}
+.subtitle{text-align:center;color:#666;font-size:11px;font-weight:normal;margin:0 0 8px 0}
 h2{margin:12px 0 4px 0;padding:6px 8px;border-left:4px solid #007bff;background:#f8f9fa;color:#007bff;font-size:14px}
 nav{display:flex;justify-content:center;gap:16px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #eee;font-size:13px}
 nav span{color:#666}
@@ -101,8 +102,26 @@ static const char MODULE_CONFIG_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
 <body><div class="container">
 )rawliteral"
     "<nav>" NAV_HOME_LINK NAV_MODULE_HERE NAV_CONFIG_LINK "</nav>\n"
-    R"rawliteral(<h1>Module settings</h1>
+    R"rawliteral(<h1 id="title">Module settings</h1>
+<div class="subtitle" id="subtitle"></div>
 <!--MODULE_CONFIG-->
+<script>
+const $=id=>document.getElementById(id);
+async function loadModuleInfo(){
+  try{
+    const r=await fetch('/api/status');
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    const d=await r.json();
+    const titleEl=$('title');
+    titleEl.textContent=d.name+' settings';
+    document.title=d.name+' settings';
+    $('subtitle').textContent='('+d.type+')';
+  }catch(e){
+    console.error('Failed to load module info:',e);
+  }
+}
+loadModuleInfo();
+</script>
 </div></body></html>
 )rawliteral";
 

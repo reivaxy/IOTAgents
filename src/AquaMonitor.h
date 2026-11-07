@@ -80,7 +80,7 @@ class AquaMonitor : public GenericModule {
               TimeSync& timeSync)
       : GenericModule(display, config, alert, httpServer, timeSync),
         store_(),
-        config_(store_.load()),
+        config_(),  // defaults, replaced by the stored values in begin()
         oneWire_(TEMPERATURE_PIN),
         tempSensor_(&oneWire_),
         temperature_(NAN),  // NAN until the first valid reading
@@ -91,6 +91,10 @@ class AquaMonitor : public GenericModule {
   const char* getType() const override { return "aquamonitor"; }
 
   void begin() override {
+    // The module is a global object: its constructor runs before NVS is initialised, so the
+    // stored configuration can only be read here.
+    config_ = store_.load();
+
     // Register the module configuration API endpoint
     httpServer_.webServer().on("/api/module/config", HTTP_GET,
                                 [this]() { handleGetModuleConfig(); });
@@ -120,6 +124,7 @@ class AquaMonitor : public GenericModule {
       const int raw = digitalRead(WATER_LEVEL_PIN);
       waterLevelOk_ = (raw == WATER_LEVEL_OK_STATE);
       Serial.printf("AquaMonitor water level: pin %d -> %s\n", raw, waterLevelOk_ ? "OK" : "NOK");
+      checkAlert(!waterLevelOk_, waterAlertSent_, waterAlert_, "AquaMonitor: water level too low");
     }
 
     if (now - lastLightRead_ >= READ_PERIOD_MS) {
@@ -128,6 +133,7 @@ class AquaMonitor : public GenericModule {
       lightOn_ = (lightLevel_ >= LIGHT_ON_THRESHOLD);
       Serial.printf("AquaMonitor light: raw %d (threshold %d) -> %s\n", lightLevel_,
                     LIGHT_ON_THRESHOLD, lightOn_ ? "ON" : "OFF");
+      checkLightAlert();
     }
 
     // Temperature is read in 2 steps: request a conversion, then read the result
@@ -138,6 +144,7 @@ class AquaMonitor : public GenericModule {
         // Retry the probe detection until it is found (wiring fixed, probe plugged later...)
         if (!tempProbeFound_ && !findTemperatureProbe()) {
           temperature_ = NAN;
+          checkTemperatureAlert();
           return;
         }
         tempSensor_.requestTemperaturesByAddress(tempAddr_);
@@ -153,6 +160,7 @@ class AquaMonitor : public GenericModule {
       } else {
         Serial.printf("AquaMonitor temperature: %.2f C\n", temperature_);
       }
+      checkTemperatureAlert();
     }
 
     // if (now - lastTemperatureRequest_ >= READ_PERIOD_MS) {
@@ -161,15 +169,22 @@ class AquaMonitor : public GenericModule {
   }
 
   JsonDocument getStatus() override {
+    // Each entry is {"value": ..., "alertMsg": ""}: alertMsg is empty when there is no anomaly,
+    // otherwise it contains the cause. The root "alert" is true when at least one entry has one.
     JsonDocument doc;
+    doc["alert"] = !tempAlert_.isEmpty() || !lightAlert_.isEmpty() || !waterAlert_.isEmpty();
     if (isnan(temperature_)) {
-      doc["temperature"] = nullptr;
+      doc["temperature"]["value"] = nullptr;
     } else {
-      doc["temperature"] = temperature_;
+      doc["temperature"]["value"] = temperature_;
     }
-    doc["lightLevel"] = lightLevel_;
-    doc["lightOn"] = lightOn_;
-    doc["waterLevelOk"] = waterLevelOk_;
+    doc["temperature"]["alertMsg"] = tempAlert_;
+    doc["lightLevel"]["value"] = lightLevel_;
+    doc["lightLevel"]["alertMsg"] = "";
+    doc["lightOn"]["value"] = lightOn_;
+    doc["lightOn"]["alertMsg"] = lightAlert_;
+    doc["waterLevelOk"]["value"] = waterLevelOk_;
+    doc["waterLevelOk"]["alertMsg"] = waterAlert_;
     return doc;
   }
 
@@ -181,22 +196,19 @@ class AquaMonitor : public GenericModule {
     html += "<script>\n";
     html += "function moduleStatus(d) {\n";
     html += "  const temp = document.getElementById('temp');\n";
-    html += "  const tmin = " + String(config_.tempMin) + ";\n";
-    html += "  const tmax = " + String(config_.tempMax) + ";\n";
-    html += "  if (d.temperature === null) { temp.textContent = 'N/A'; temp.className = 'nok'; }\n";
-    html += "  else {\n";
-    html += "    temp.textContent = d.temperature.toFixed(1) + '°C';\n";
-    html += "    if (d.temperature < tmin || d.temperature > tmax) temp.className = 'nok';\n";
-    html += "    else temp.className = 'ok';\n";
-    html += "  }\n";
+    html += "  temp.textContent = d.temperature.value === null ? 'N/A' : d.temperature.value.toFixed(1) + '°C';\n";
+    html += "  temp.className = d.temperature.alertMsg ? 'nok' : 'ok';\n";
+    html += "  temp.title = d.temperature.alertMsg;\n";
     html += "\n";
     html += "  const light = document.getElementById('light');\n";
-    html += "  light.textContent = d.lightOn ? 'ON' : 'OFF';\n";
-    html += "  light.className = d.lightOn ? 'ok' : '';\n";
+    html += "  light.textContent = d.lightOn.value ? 'ON' : 'OFF';\n";
+    html += "  light.className = d.lightOn.alertMsg ? 'nok' : (d.lightOn.value ? 'ok' : '');\n";
+    html += "  light.title = d.lightOn.alertMsg;\n";
     html += "\n";
     html += "  const water = document.getElementById('water');\n";
-    html += "  water.textContent = d.waterLevelOk ? 'OK' : 'NOK';\n";
-    html += "  water.className = d.waterLevelOk ? 'ok' : 'nok';\n";
+    html += "  water.textContent = d.waterLevelOk.value ? 'OK' : 'NOK';\n";
+    html += "  water.className = d.waterLevelOk.alertMsg ? 'nok' : 'ok';\n";
+    html += "  water.title = d.waterLevelOk.alertMsg;\n";
     html += "}\n";
     html += "</script>\n";
     return html;
@@ -317,6 +329,69 @@ class AquaMonitor : public GenericModule {
   }
 
  private:
+  // Sends `text` once per anomaly: the sent flag is set only when SmsRelay accepted the alert
+  // (otherwise it is retried at the next measure) and cleared when the value is ok again.
+  // `cause` is exposed in the status: `text` during an anomaly, empty otherwise.
+  void checkAlert(bool anomaly, bool& sent, String& cause, const String& text) {
+    cause = anomaly ? text : String();
+    if (!anomaly) {
+      sent = false;
+    } else if (!sent) {
+      sent = alert_.send(text);
+    }
+  }
+
+  void checkTemperatureAlert() {
+    if (isnan(temperature_)) {
+      checkAlert(true, tempAlertSent_, tempAlert_, "AquaMonitor: temperature probe not responding");
+    } else if (temperature_ < config_.tempMin) {
+      checkAlert(true, tempAlertSent_, tempAlert_,
+                 "AquaMonitor: temperature too low (" + String(temperature_, 1) + " C)");
+    } else if (temperature_ > config_.tempMax) {
+      checkAlert(true, tempAlertSent_, tempAlert_,
+                 "AquaMonitor: temperature too high (" + String(temperature_, 1) + " C)");
+    } else {
+      checkAlert(false, tempAlertSent_, tempAlert_, "");
+    }
+  }
+
+  // True when `hour` is in [start, end[ (the range may wrap around midnight).
+  static bool hourInRange(int hour, int start, int end) {
+    return start <= end ? (hour >= start && hour < end) : (hour >= start || hour < end);
+  }
+
+  // The "on" windows must see the light ON and the "off" windows must see it OFF. Windows are
+  // [start, end[: the end hour is not checked (8 to 10 covers 08:00 to 09:59). Outside the
+  // windows the state is not restricted: no alert, flag unchanged.
+  void checkLightAlert() {
+    if (!timeSync_.isSynced() || !timeSync_.hasUtcOffset()) {
+      lightAlert_ = "";
+      return;  // the expected state is unknown without the local time
+    }
+    const time_t now = timeSync_.now();
+    tm local;
+    localtime_r(&now, &local);
+    const int h = local.tm_hour;
+
+    const bool mustBeOn = hourInRange(h, config_.light1OnStart, config_.light1OnEnd) ||
+                          hourInRange(h, config_.light2OnStart, config_.light2OnEnd);
+    const bool mustBeOff = hourInRange(h, config_.light1OffStart, config_.light1OffEnd) ||
+                           hourInRange(h, config_.light2OffStart, config_.light2OffEnd);
+
+    if (mustBeOn == mustBeOff) {
+      lightAlert_ = "";
+      return;  // not restricted (or contradictory windows): no alert, flag unchanged
+    }
+
+    if (mustBeOn && !lightOn_) {
+      checkAlert(true, lightAlertSent_, lightAlert_, "AquaMonitor: light is OFF but should be ON");
+    } else if (mustBeOff && lightOn_) {
+      checkAlert(true, lightAlertSent_, lightAlert_, "AquaMonitor: light is ON but should be OFF");
+    } else {
+      checkAlert(false, lightAlertSent_, lightAlert_, "");  // state matches the restriction
+    }
+  }
+
   // Look for a DS18B20 on the OneWire bus. Returns true when found.
   bool findTemperatureProbe() {
     tempProbeFound_ = false;
@@ -388,4 +463,14 @@ class AquaMonitor : public GenericModule {
   bool temperatureRequested_ = false;
   DeviceAddress tempAddr_ = {0};
   bool tempProbeFound_ = false;
+
+  // An alert has been sent for the current anomaly (reset when the value is ok again)
+  bool tempAlertSent_ = false;
+  bool lightAlertSent_ = false;
+  bool waterAlertSent_ = false;
+
+  // Cause of the current anomaly (empty when none), exposed in the status
+  String tempAlert_;
+  String lightAlert_;
+  String waterAlert_;
 };

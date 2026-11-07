@@ -1,12 +1,38 @@
 # Aquamonitor
 
-This device is intended to monitor a few critical parameters of a reef tank or other kind of aquarium:
+This device is intended to monitor a few critical parameters of a reef tank or other kinds of aquarium:
 
 - water temperature
 - water level 
 - lighting schedule.
+- (wip, hopefully) water circulation
 
 It relies on the IOTAGents module base class and features (see next chapter) which comes from this repository "main" branch.
+
+## Components:
+
+- ESP32-WROOM-32E
+- DS18B20 waterproof temperature probe
+- 4.7k resistor (pull-up between the DS18B20 DATA line and 3.3V)
+- Water level switch (float switch)
+- Photoresistor (LDR) and 2 fixed resistor aournd 22K to build the voltage divider
+- SSD1306 I2C OLED display (0x3C)
+- A companion SMSrelay device (see [SMSRelay](https://github.com/reivaxy/SMSRelay)) to transmit alerts over SMS and Push notif.
+
+
+## Wiring:
+
+| ESP32 pin | Connected to | Notes |
+|-----------|--------------|-------|
+| GPIO 4    | DS18B20 temperature probe (DATA) | OneWire bus. Needs a 4.7k pull-up resistor between DATA and 3.3V. |
+| GPIO 25   | Water level switch | Digital input with internal pull-up: the switch connects the pin to GND. Pin HIGH = water level OK. |
+| GPIO 34   | Photoresistor (light sensor) | Analog input on ADC1 (ADC2 is unusable while WiFi is on). 12-bit reading, light considered ON when the raw value is 1000 or more. Input-only pin: it has no internal pull-up, so use an external voltage divider. |
+| GPIO 23   | SSD1306 OLED display (SDA) | I2C, address 0x3C. |
+| GPIO 18   | SSD1306 OLED display (SCL) | I2C, address 0x3C. |
+| 3.3V      | DS18B20 VDD, OLED VCC, sensors supply | |
+| GND       | Common ground of all components | |
+
+The pin assignments are defined in `src/AquaMonitor.h` (sensors) and `src/Display.h` (OLED).
 
 
 # IOTAgents module architecture
@@ -24,15 +50,15 @@ The base contract is defined in `src/GenericModule.h`.
 The following parts are shared by every device:
 
 - WiFi connection and access point setup
-- settings storage and loading
+- settings saving and loading
 - NTP / time sync
-- alert system and SMS relay handling: check the [companion project SMSRelay](https://github.com/reivaxy/SMSRelay) used to send SMS and Push notifications.
-- display lifecycle
+- alert system and SMS relay handling: check the [companion project SMSRelay](https://github.com/reivaxy/SMSRelay) used to send SMS and Push notifications. Manual setting or auto discovery.
+- display management
 - HTTP server wiring
 - generic pages and generic REST endpoints
 - the common module entry point created in `src/main.cpp`
 
-This is the part that should remain stable across branches. In other words, if a change is needed for the platform itself, it is usually made once in the shared code (`main` branch) and then reused by every device.
+This is the part that should remain stable across branches. In other words, if a change is needed for the platform itself, it needs to be done once in the shared code (`main` branch) and then reused by every device by merging "main" into the device own branch.
 
 ## 2) What is specific to each module
 

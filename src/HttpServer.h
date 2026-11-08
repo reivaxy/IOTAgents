@@ -2,9 +2,7 @@
 
 #include <Arduino.h>
 #include <ArduinoJson.h>
-#include <Update.h>
-#include <WebServer.h>
-#include <WiFi.h>
+#include "Platform.h"
 
 #include "BuildInfo.h"
 #include "Config.h"
@@ -363,14 +361,14 @@ class HttpServer {
         updateError_ = "";
         updateDone_ = false;
         Serial.printf("OTA update started: %s\n", upload.filename.c_str());
-        if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {
-          updateError_ = Update.errorString();
+        if (!Update.begin(firmwareUpdateSize())) {
+          updateError_ = firmwareUpdateError();
         }
         break;
       case UPLOAD_FILE_WRITE:
         if (updateError_.isEmpty() &&
             Update.write(upload.buf, upload.currentSize) != upload.currentSize) {
-          updateError_ = Update.errorString();
+          updateError_ = firmwareUpdateError();
         }
         break;
       case UPLOAD_FILE_END:
@@ -378,12 +376,16 @@ class HttpServer {
           if (Update.end(true)) {
             updateDone_ = true;
           } else {
-            updateError_ = Update.errorString();
+            updateError_ = firmwareUpdateError();
           }
         }
         break;
       case UPLOAD_FILE_ABORTED:
+      #if defined(ESP8266)
+        Update.end();
+      #else
         Update.abort();
+      #endif
         updateError_ = "Upload aborted";
         break;
     }

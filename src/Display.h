@@ -1,7 +1,7 @@
 #pragma once
 
 #include <Arduino.h>
-#include <WiFi.h>
+#include "Platform.h"
 #include <XIOTDisplay.h>
 #include <qrcode.h>
 #include <time.h>
@@ -55,7 +55,7 @@ class Display {
     }
 
     String ip;
-    const wifi_mode_t mode = WiFi.getMode();
+    const auto mode = WiFi.getMode();
     const bool connected = mode == WIFI_STA && WiFi.status() == WL_CONNECTED;
     if (connected) {
       ip = WiFi.localIP().toString();
@@ -128,8 +128,13 @@ class Display {
 
  private:
   static constexpr int OLED_ADDR = 0x3C;
+#if defined(ESP8266)
+  static constexpr int OLED_SDA = 4;
+  static constexpr int OLED_SCL = 5;
+#else
   static constexpr int OLED_SDA = 23;
   static constexpr int OLED_SCL = 18;
+#endif
   static constexpr int LINE_WARNING_TITLE = 1;
   static constexpr int LINE_WARNING_TEXT = 2;
   static constexpr int LINE_STATUS = 4;  // last line: "<ip>   <time>", centered

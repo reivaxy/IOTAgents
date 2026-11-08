@@ -2,8 +2,7 @@
 
 #include <Arduino.h>
 #include <ArduinoJson.h>
-#include <HTTPClient.h>
-#include <WiFi.h>
+#include "Platform.h"
 #include <WiFiClientSecure.h>
 #include <time.h>
 
@@ -115,7 +114,7 @@ class TimeSync {
     client.setInsecure();  // Certificate checks are deliberately disabled.
 
     HTTPClient http;
-    http.setConnectTimeout(HTTP_TIMEOUT_MS);
+    setHttpConnectTimeout(client, http, HTTP_TIMEOUT_MS);
     http.setTimeout(HTTP_TIMEOUT_MS);
     http.setUserAgent("NewAquaMonitor/1.0");
     http.setReuse(false);  // one request per connection: "Connection: close", socket closed by end()

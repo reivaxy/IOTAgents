@@ -4,6 +4,7 @@
 #include <ArduinoJson.h>
 #include <Update.h>
 #include <WebServer.h>
+#include <WiFi.h>
 
 #include "BuildInfo.h"
 #include "Config.h"
@@ -128,6 +129,8 @@ class HttpServer {
     doc["type"] = module_ ? module_->getType() : "generic";
     doc["smsRelayNotFound"] = smsRelayScanner_.isNotFound();
     doc["smsRelayIp"] = config_.smsRelayIp;
+    doc["homeWifiConnected"] = (WiFi.getMode() == WIFI_STA && WiFi.status() == WL_CONNECTED);
+    doc["hasfallbackWifi"] = !config_.fallbackSsid.isEmpty();
     if (timeSync_.isSynced()) {
       doc["epoch"] = static_cast<int64_t>(timeSync_.now());
       doc["utcOffset"] = timeSync_.utcOffset();

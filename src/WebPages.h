@@ -56,6 +56,8 @@ static const char HOME_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
     "<nav>" NAV_HOME_HERE NAV_MODULE_LINK NAV_CONFIG_LINK "</nav>\n"
     R"rawliteral(<h1 id="name">...</h1>
 <div id="relay" class="alert" hidden>SmsRelay not found: alerts cannot be sent. Check the <a href="/config">Generic Settings</a>.</div>
+<div id="homeWifi" class="alert" hidden>Home WiFi not available. Check the <a href="/config">Generic Settings</a> or connect to the fallback WiFi AP.</div>
+<div id="fallbackWifi" class="alert" hidden>Fallback WiFi AP not configured. Get fallback WiFi credentials from <a href="#">SmsRelay</a> and check the <a href="/config">Generic Settings</a>.</div>
 <table>
 <!--MODULE_STATUS-->
 <tr><td>Module time</td><td id="time">-</td></tr>
@@ -81,6 +83,8 @@ async function refresh(){
     document.getElementById('name').textContent=d.name;
     document.title=d.name;
     document.getElementById('relay').hidden=!d.smsRelayNotFound;
+    document.getElementById('homeWifi').hidden=d.homeWifiConnected;
+    document.getElementById('fallbackWifi').hidden=d.homeWifiConnected||d.hasfallbackWifi;
     baseEpoch=d.epoch;utcOffset=d.utcOffset||0;baseTick=performance.now();
     showTime();
     if(typeof moduleStatus==='function')moduleStatus(d.module);

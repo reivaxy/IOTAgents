@@ -35,6 +35,7 @@ class SmsRelayScanner {
   // Starts (or restarts) a scan. Returns false if not connected to the home network.
   bool start() {
     if (!isStaConnected()) return false;
+    if (usingFallbackWifi_) return verify(FALLBACK_AP_IP);
     prefix_ = WiFi.localIP();
     next_ = IP_START;
     scanning_ = true;
@@ -53,10 +54,21 @@ class SmsRelayScanner {
   // scanning.
   bool isNotFound() const {
     return !scanning_ &&
-           ((autoChecked_ && config_->smsRelayIp.isEmpty()) || manualCheckFailed_ || pingFailed_);
+           ((!usingFallbackWifi_ && autoChecked_ && config_->smsRelayIp.isEmpty()) ||
+            manualCheckFailed_ || pingFailed_);
   }
 
   void stop() { finish(); }
+
+  // A new network needs a fresh ping with the module's new STA address.
+  void onWifiConnected(bool fallback) {
+    finish();
+    usingFallbackWifi_ = fallback;
+    autoChecked_ = false;
+    manualCheckFailed_ = false;
+    pingFailed_ = false;
+    update();
+  }
 
   // Calls /api/ping on a manually entered IP and remembers whether SmsRelay answered (this drives
   // isNotFound()). An empty IP clears the failure. Nothing is checked (true is returned) when not
@@ -64,14 +76,15 @@ class SmsRelayScanner {
   bool verify(const String& ip, uint32_t timeoutMs = SCAN_TIMEOUT_MS) {
     pingFailed_ = false;  // the IP may have changed: the periodic ping state no longer applies
     lastPing_ = millis();
-    if (ip.isEmpty()) {
+    const String target = usingFallbackWifi_ ? String(FALLBACK_AP_IP) : ip;
+    if (target.isEmpty()) {
       manualCheckFailed_ = false;
       return true;
     }
     if (!isStaConnected()) return true;
 
     IPAddress addr;
-    if (!addr.fromString(ip)) return false;
+    if (!addr.fromString(target)) return false;
     const String url = pingUrl(addr);
     Serial.printf("SmsRelay check: %s (self %s, mask %s, gateway %s)\n", url.c_str(),
                   WiFi.localIP().toString().c_str(), WiFi.subnetMask().toString().c_str(),
@@ -89,6 +102,15 @@ class SmsRelayScanner {
 
   void update() {
     if (!isStaConnected()) return;
+
+    // Never scan the fallback subnet or use/persist the home-network relay IP here.
+    if (usingFallbackWifi_) {
+      if (!autoChecked_ || millis() - lastPing_ >= PING_INTERVAL_MS) {
+        autoChecked_ = true;
+        verify(FALLBACK_AP_IP);
+      }
+      return;
+    }
 
     if (!autoChecked_) {
       autoChecked_ = true;
@@ -147,6 +169,7 @@ class SmsRelayScanner {
  private:
   static constexpr uint32_t SCAN_TIMEOUT_MS = 2000;  // connect and read, scan and startup check
   static constexpr const char* PING_PATH = "/api/ping";
+  static constexpr const char* FALLBACK_AP_IP = "192.168.4.1";
   static constexpr const char* EXPECTED_ANSWER = "SmsRelay";
   static constexpr const char* CONNECTED_MESSAGE = "module connected";
 
@@ -154,6 +177,7 @@ class SmsRelayScanner {
   ConfigStore* store_ = nullptr;
   Alert* alert_ = nullptr;
   const GenericModule* module_ = nullptr;
+  bool usingFallbackWifi_ = false;
   bool autoChecked_ = false;
   bool scanning_ = false;
   bool manualCheckFailed_ = false;
@@ -209,9 +233,31 @@ class SmsRelayScanner {
     if (code == HTTP_CODE_OK) {
       String body = http.getString();
       body.trim();
-      found = body == EXPECTED_ANSWER;
-      Serial.printf("  ping HTTP 200, body (%u bytes): '%s'%s\n", body.length(), body.c_str(),
-                    found ? "" : " -> not the expected answer");
+      
+      // Try to parse response as JSON: {"name":"SmsRelay","ssid":"...","password":"..."}
+      JsonDocument response;
+      if (deserializeJson(response, body) == DeserializationError::Ok) {
+        const char* name = response["name"];
+        if (name != nullptr && strcmp(name, EXPECTED_ANSWER) == 0) {
+          found = true;
+          // Save fallback WiFi credentials if present
+          const char* ssid = response["ssid"];
+          const char* password = response["password"];
+          if (ssid != nullptr && password != nullptr) {
+            config_->fallbackSsid = ssid;
+            config_->fallbackPwd = password;
+            store_->saveFallbackWifi(*config_);
+            Serial.printf("  Fallback WiFi saved: SSID='%s'\n", ssid);
+          }
+          Serial.printf("  ping HTTP 200, SmsRelay found\n");
+        } else {
+          Serial.printf("  ping HTTP 200, body (%u bytes): '%s' -> not the expected answer\n", 
+                        body.length(), body.c_str());
+        }
+      } else {
+        Serial.printf("  ping HTTP 200, invalid JSON response (%u bytes): '%s'\n", 
+                      body.length(), body.c_str());
+      }
     } else {
       Serial.printf("  ping failed: HTTP %d (%s)\n", code, HTTPClient::errorToString(code).c_str());
     }

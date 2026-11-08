@@ -15,6 +15,8 @@ struct Config {
   String homePwd;
   String apSsid;
   String apPwd;
+  String fallbackSsid;          // fallback WiFi SSID from SmsRelay
+  String fallbackPwd;           // fallback WiFi password from SmsRelay
   bool flipScreen = true;       // rotate the display by 180 degrees
   String smsRelayIp;            // empty = not discovered yet
   int32_t utcOffset = 0;        // seconds, valid only if utcOffsetReadAt > 0
@@ -33,6 +35,8 @@ class ConfigStore {
     c.homePwd = prefs.getString("homePwd", "");
     c.apSsid = prefs.getString("apSsid", "");
     c.apPwd = prefs.getString("apPwd", "");
+    c.fallbackSsid = prefs.getString("fallbackSsid", "");
+    c.fallbackPwd = prefs.getString("fallbackPwd", "");
     c.flipScreen = prefs.getBool("flip", true);
     c.smsRelayIp = prefs.getString("smsRelayIp", "");
     c.utcOffset = prefs.getInt("utcOffset", 0);
@@ -64,6 +68,14 @@ class ConfigStore {
     Preferences prefs;
     prefs.begin(NAMESPACE, false);
     prefs.putString("smsRelayIp", c.smsRelayIp);
+    prefs.end();
+  }
+
+  void saveFallbackWifi(const Config& c) {
+    Preferences prefs;
+    prefs.begin(NAMESPACE, false);
+    prefs.putString("fallbackSsid", c.fallbackSsid);
+    prefs.putString("fallbackPwd", c.fallbackPwd);
     prefs.end();
   }
 

@@ -2,8 +2,7 @@
 
 #include <Arduino.h>
 #include <ArduinoJson.h>
-#include <HTTPClient.h>
-#include <WiFi.h>
+#include "Platform.h"
 #include <WiFiClient.h>
 
 #include "Config.h"
@@ -39,7 +38,7 @@ class Alert {
 
     WiFiClient client;
     HTTPClient http;
-    http.setConnectTimeout(CONNECT_TIMEOUT_MS);
+    setHttpConnectTimeout(client, http, CONNECT_TIMEOUT_MS);
     http.setTimeout(READ_TIMEOUT_MS);
     http.setReuse(false);  // one request per connection: "Connection: close", socket closed by end()
     if (!http.begin(client, url)) {

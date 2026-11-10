@@ -1,5 +1,5 @@
 #include <Arduino.h>
-#include <WiFi.h>
+#include "Platform.h"
 
 #include "Alert.h"
 #include "AquaMonitor.h"
@@ -61,7 +61,7 @@ bool connectSta() {
     // Modem sleep delays ARP replies and SYN-ACKs (buffered by the AP until the next beacon),
     // which makes short connect timeouts fail even for hosts that are up (SmsRelay checks and
     // alerts). The module is mains powered, so keep the radio awake.
-    WiFi.setSleep(false);
+    disableWifiSleep();
     Serial.print("Connected, IP address: ");
     Serial.println(WiFi.localIP());
     usingFallbackWifi = false;
@@ -91,7 +91,7 @@ bool connectFallbackAp() {
   }
 
   if (WiFi.status() == WL_CONNECTED) {
-    WiFi.setSleep(false);
+    disableWifiSleep();
     Serial.print("Connected to fallback network, IP address: ");
     Serial.println(WiFi.localIP());
     usingFallbackWifi = true;

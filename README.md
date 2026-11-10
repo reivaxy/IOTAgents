@@ -40,10 +40,31 @@ The pin assignments are defined in `src/AquaMonitor.h` (sensors) and `src/Displa
 This project is built around a shared base class, `GenericModule`, and a set of device-specific implementations. The idea is:
 
 - common infrastructure stays in the `main` branch
-- each device type (for example, `feeder` and `aquamonitor`) gets its own branch and module class overriding the GenericModule class.
+- each device type (for example, `feeder` and `aquamonitor`) gets its own branch and module class deriving from `GenericModule`
 - only the device-specific behavior is overridden
 
-The base contract is defined in `src/GenericModule.h`.
+The base contract is defined in [src/GenericModule.h](src/GenericModule.h).
+
+## ESP32 and ESP8266 compatibility
+
+The shared platform supports **ESP32 and ESP8266** with the same module contract, web pages, JSON API, WiFi fallback, time synchronization, alerts, and browser-based firmware updates. Check the available profiles in [platformio.ini](platformio.ini).
+
+Both profiles use the Arduino framework, C++17, and a 115200-baud serial monitor. Set the upload and monitor ports to match your device. Select the corresponding environment in PlatformIO to build, upload, or monitor it.
+
+[src/Platform.h](src/Platform.h) handles differences in WiFi headers, HTTP clients, web server types, WiFi sleep control, and firmware update APIs. Include it when module code needs those shared networking APIs rather than importing ESP32-only headers. ESP8266 uses an `ESP8266WebServer` alias named `WebServer`.
+
+Settings use the `Preferences` API: native NVS on ESP32 and the `vshymanskyy/Preferences@^2.1.0` compatibility library on ESP8266. Device-specific settings should use their own namespace rather than the shared `aquamon` namespace used by `ConfigStore`; do not assume ESP32-native NVS APIs are portable.
+
+The SSD1306 OLED is configured at I2C address `0x3C` in [src/Display.h](src/Display.h):
+
+| Target | SDA | SCL |
+| --- | --- | --- |
+| ESP32 | GPIO23 | GPIO18 |
+| ESP8266 | GPIO4 (D2 on NodeMCU-style boards) | GPIO5 (D1 on NodeMCU-style boards) |
+
+GPIO numbers are authoritative; board labels may differ. Product-specific sensors, actuators, libraries, and pins still need to be checked for each target. ESP8266 also has less RAM and flash headroom, so keep module HTML/JSON payloads and buffers small and avoid long-running work in `update()`.
+
+Firmware updates are available from **Generic Settings** and use `POST /api/update`. Upload only a binary built for the target board. ESP8266 OTA requires enough free sketch space for the new image; ESP32 requires an OTA-capable partition layout. [scripts/firmware_name.py](scripts/firmware_name.py) names the binary `firmware_<sanitized-branch>_<chip>.bin`, where `<chip>` is `esp32` or `esp8266`, so the target remains identifiable when the binary is copied out of its PlatformIO environment output directory.
 
 ## 1) What is common to all modules
 
@@ -56,7 +77,8 @@ The following parts are shared by every device:
 - display management
 - HTTP server wiring
 - generic pages and generic REST endpoints
-- the common module entry point created in `src/main.cpp`
+- browser-based OTA firmware updates and device restart
+- the common module entry point created in [src/main.cpp](src/main.cpp)
 
 This is the part that should remain stable across branches. In other words, if a change is needed for the platform itself, it needs to be done once in the shared code (`main` branch) and then reused by every device by merging "main" into the device own branch.
 
@@ -71,7 +93,7 @@ Each module is different in behavior and UI. Typical per-module logic includes:
 - validation and persistence of device-specific settings in `saveConfig()`
 - custom `begin()` and `update()` logic for sensor polling, actuator control, timers, etc.
 
-Those are the methods that must be overridden in a derived module.
+Override only the methods needed by the derived module. `getConfigHtml()` is inserted into the dedicated `/module/config` page; its own script must send JSON to `POST /api/module/config`. The generic page does not submit module forms automatically.
 
 ## 3) The base contract
 
@@ -90,28 +112,37 @@ class GenericModule {
 };
 ```
 
-The default implementations do nothing and return a placeholder message. This makes `GenericModule` usable as a generic fallback while allowing real modules to override only the behaviors they need.
+The default `begin()` and `update()` do nothing. The status and HTML methods return placeholders; `saveConfig()` rejects settings with `false` and the error "This module has no specific settings". This makes `GenericModule` usable as a generic fallback while allowing real modules to override only the behaviors they need.
+
+The constructor receives `Display`, `Config`, `Alert`, `HttpServer`, and `TimeSync` references, available to subclasses as `display_`, `config_`, `alert_`, `httpServer_`, and `timeSync_`. The base class also has a virtual destructor.
+
+`begin()` runs once in `setup()`, after the shared services are initialized but before WiFi connection and HTTP server startup. Extra routes can be registered through `httpServer_.webServer()` there; include [src/HttpServer.h](src/HttpServer.h) in the implementation when using it. `update()` runs on every `loop()` iteration and should return promptly so shared services remain responsive.
+
+`saveConfig()` must validate, apply, and persist module settings itself. Return `true` for HTTP 200 with `{"ok":true}`, or return `false` and set `error` for HTTP 400 with `{"error":"..."}`. Loading persisted module settings is also the subclass's responsibility, typically in `begin()`.
 
 ## 4) How to create a new module branch
 
 A good pattern is to keep the shared project on the main branch and create one branch per hardware profile.
 
-Example branch names:
+For example, create a feeder branch:
 
 ```bash
 git checkout main
 git pull
 
 git checkout -b feeder
-git checkout -b aquamonitor
 ```
 
-Specific module branches will be created under the module branch:
+For an aquamonitor, start again from `main` and create `aquamonitor` instead. These are alternative product branches, not branches created from one another.
+
+Create fix or feature branches from the relevant product branch, for example:
 
 ```bash
+git checkout feeder
 git checkout -b feeder/fix/something
-git checkout -b feeder/feature/somethingElse
 ```
+
+Likewise, start from `feeder` again before creating `feeder/feature/somethingElse`. Slashes are a naming convention, not a Git parent/child relationship.
 
 The branch should contain the module-specific class and any settings that differ for that product, while the rest of the codebase remains shared.
 
@@ -155,13 +186,15 @@ class FeederModule : public GenericModule {
   }
 
   bool saveConfig(JsonObjectConst cfg, String& error) override {
-    // validate feeder config
-    return true;
+    // Replace with validation, application, and persistence of feeder settings.
+    (void)cfg;
+    error = "Feeder settings are not implemented in this example";
+    return false;
   }
 };
 ```
 
-Then in `src/main.cpp`, replace the generic module instance with the device-specific one:
+Then in [src/main.cpp](src/main.cpp), include the device-specific class header and replace the generic module instance with the device-specific one:
 
 ```cpp
 FeederModule module(display, config, alert, httpServer, timeSync);
@@ -169,7 +202,7 @@ FeederModule module(display, config, alert, httpServer, timeSync);
 
 ## 6) Example: an aquamonitor module
 
-The aquamonitor is similar in architecture, but its status and settings are focused on water monitoring.
+The aquamonitor is similar in architecture, but its status and settings are focused on water monitoring. The following is an illustrative status and HTML fragment, not a complete settings implementation:
 
 ```cpp
 class AquaMonitorModule : public GenericModule {
@@ -191,7 +224,7 @@ class AquaMonitorModule : public GenericModule {
   String getConfigHtml() override {
     return R"(
       <h2>AquaMonitor settings</h2>
-      <form>
+      <form onsubmit="event.preventDefault()">
         <label>Low water threshold <input name="lowLevel" value="20"></label>
       </form>
     )";
@@ -199,7 +232,9 @@ class AquaMonitorModule : public GenericModule {
 };
 ```
 
-And in `main.cpp`:
+To make this form functional, render the stored threshold instead of a hard-coded value, add a submit handler posting JSON to `/api/module/config`, and override `saveConfig()` to validate, apply, and persist it. Without that override, the base implementation rejects module settings.
+
+And in [src/main.cpp](src/main.cpp), after including the device-specific class header:
 
 ```cpp
 AquaMonitorModule module(display, config, alert, httpServer, timeSync);
@@ -213,6 +248,7 @@ Common for every device:
 - base lifecycle (`begin()`, `update()`)
 - generic status and config infrastructure
 - shared WiFi / HTTP / networking behavior
+- ESP32 / ESP8266 compatibility through [src/Platform.h](src/Platform.h)
 - platform-wide defaults and project setup
 
 Specific for each device:

@@ -2,8 +2,7 @@
 
 #include <Arduino.h>
 #include <ArduinoJson.h>
-#include <HTTPClient.h>
-#include <WiFi.h>
+#include "Platform.h"
 #include <WiFiClient.h>
 
 #include "Alert.h"
@@ -199,7 +198,12 @@ class SmsRelayScanner {
   static void logReachability(const IPAddress& ip, uint16_t port) {
     WiFiClient client;
     const uint32_t startMs = millis();
+  #if defined(ESP8266)
+    client.setTimeout(2000);
+    const bool connected = client.connect(ip, port);
+  #else
     const bool connected = client.connect(ip, port, 2000);
+  #endif
     const uint32_t elapsedMs = millis() - startMs;
     client.stop();
     Serial.printf("  TCP test %s:%u -> %s (%lu ms)\n", ip.toString().c_str(), port,
@@ -220,7 +224,7 @@ class SmsRelayScanner {
 
     WiFiClient client;
     HTTPClient http;
-    http.setConnectTimeout(timeoutMs);
+    setHttpConnectTimeout(client, http, timeoutMs);
     http.setTimeout(timeoutMs);
     http.setReuse(false);  // one request per connection: "Connection: close", socket closed by end()
     if (!http.begin(client, url)) {

@@ -125,6 +125,11 @@ class HttpServer {
     }
     doc["name"] = config_.name;
     doc["type"] = module_ ? module_->getType() : "generic";
+  #if defined(ESP8266)
+    doc["board"] = "esp8266";
+  #else
+    doc["board"] = "esp32";
+  #endif
     doc["smsRelayNotFound"] = smsRelayScanner_.isNotFound();
     doc["smsRelayIp"] = config_.smsRelayIp;
     doc["homeWifiConnected"] = (WiFi.getMode() == WIFI_STA && WiFi.status() == WL_CONNECTED);

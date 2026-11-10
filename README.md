@@ -27,7 +27,7 @@ The SSD1306 OLED is configured at I2C address `0x3C` in [src/Display.h](src/Disp
 
 GPIO numbers are authoritative; board labels may differ. Product-specific sensors, actuators, libraries, and pins still need to be checked for each target. ESP8266 also has less RAM and flash headroom, so keep module HTML/JSON payloads and buffers small and avoid long-running work in `update()`.
 
-Firmware updates are available from **Generic Settings** and use `POST /api/update`. Upload only a binary built for the target board. ESP8266 OTA requires enough free sketch space for the new image; ESP32 requires an OTA-capable partition layout. [scripts/firmware_name.py](scripts/firmware_name.py) names the binary after the sanitized Git branch, not the chip, so distinguish targets by their PlatformIO environment output directory.
+Firmware updates are available from **Generic Settings** and use `POST /api/update`. Upload only a binary built for the target board. ESP8266 OTA requires enough free sketch space for the new image; ESP32 requires an OTA-capable partition layout. [scripts/firmware_name.py](scripts/firmware_name.py) names the binary `firmware_<sanitized-branch>_<chip>.bin`, where `<chip>` is `esp32` or `esp8266`, so the target remains identifiable when the binary is copied out of its PlatformIO environment output directory.
 
 ## 1) What is common to all modules
 

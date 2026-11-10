@@ -11,7 +11,9 @@ branch = subprocess.check_output(
 # Sanitize branch name for filesystem compatibility
 branch = re.sub(r'[^a-zA-Z0-9_-]', '_', branch)
 
-# Set firmware filename
-env.Replace(PROGNAME="firmware_" + branch)
+# Include the chip type from the selected board, independently of the environment name.
+chip = env.BoardConfig().get("build.mcu")
+env.Replace(PROGNAME="firmware_" + branch + "_" + chip)
 
 print("Firmware branch:", branch)
+print("Firmware chip:", chip)

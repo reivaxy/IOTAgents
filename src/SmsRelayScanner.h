@@ -22,7 +22,8 @@
 class SmsRelayScanner {
  public:
   static constexpr uint32_t SAVE_CHECK_TIMEOUT_MS = 10000;  // connect and read, check on config save
-  static constexpr uint32_t PING_INTERVAL_MS = 10UL * 60 * 1000;
+  // Periodically ping the known SmsRelay IP to check its availability
+  static constexpr uint32_t PING_INTERVAL_MS = 5UL * 60 * 1000;
 
   void begin(Config& config, ConfigStore& store, Alert& alert, const GenericModule& module) {
     config_ = &config;

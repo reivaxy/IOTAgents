@@ -19,6 +19,13 @@ It relies on the IOTAGents module base class and features (see next chapter) whi
 - SSD1306 I2C OLED display (0x3C)
 - A companion SMSrelay device (see [SMSRelay](https://github.com/reivaxy/SMSRelay)) to transmit alerts over SMS and Push notif.
 
+Home page: 
+
+<img width="420" alt="Home page" src="https://github.com/reivaxy/IOTAgents/blob/AquaMonitor/res/home.jpg" />
+
+Module settings:
+
+<img width="420" alt="Module settings" src="https://github.com/reivaxy/IOTAgents/blob/AquaMonitor/res/settings.jpg" />
 
 ## Wiring:
 

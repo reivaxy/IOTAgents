@@ -47,7 +47,7 @@ This is the part that should remain stable across branches. In other words, if a
 
 Settings page:
 
-<img width="420" alt="Settings" src="https://github.com/reivaxy/IOTAgents/blob/main/res/settings.jpg" />
+<img width="420" alt="Settings" src="https://github.com/reivaxy/IOTAgents/blob/main/res/genericSettings.jpg" />
 
 
 ## 2) What is specific to each module

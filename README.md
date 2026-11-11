@@ -45,6 +45,11 @@ The following parts are shared by every device:
 
 This is the part that should remain stable across branches. In other words, if a change is needed for the platform itself, it is usually made once in the shared code (`main` branch) and then reused by every device.
 
+Settings page:
+
+<img width="420" alt="Settings" src="https://github.com/reivaxy/IOTAgents/blob/main/res/settings.jpg" />
+
+
 ## 2) What is specific to each module
 
 Each module is different in behavior and UI. Typical per-module logic includes:

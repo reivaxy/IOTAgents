@@ -63,6 +63,8 @@ Each module is different in behavior and UI. Typical per-module logic includes:
 
 Override only the methods needed by the derived module. `getConfigHtml()` is inserted into the dedicated `/module/config` page; its own script must send JSON to `POST /api/module/config`. The generic page does not submit module forms automatically.
 
+Here is the first implemented module, whose goal is to monitor some aquarium parameters: https://github.com/reivaxy/IOTAgents/tree/AquaMonitor
+
 ## 3) The base contract
 
 `GenericModule` exposes the following extension points:

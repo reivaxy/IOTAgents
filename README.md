@@ -82,6 +82,11 @@ The following parts are shared by every device:
 
 This is the part that should remain stable across branches. In other words, if a change is needed for the platform itself, it needs to be done once in the shared code (`main` branch) and then reused by every device by merging "main" into the device own branch.
 
+Settings page:
+
+<img width="420" alt="Settings" src="https://github.com/reivaxy/IOTAgents/blob/main/res/genericSettings.jpg" />
+
+
 ## 2) What is specific to each module
 
 Each module is different in behavior and UI. Typical per-module logic includes:
@@ -94,6 +99,8 @@ Each module is different in behavior and UI. Typical per-module logic includes:
 - custom `begin()` and `update()` logic for sensor polling, actuator control, timers, etc.
 
 Override only the methods needed by the derived module. `getConfigHtml()` is inserted into the dedicated `/module/config` page; its own script must send JSON to `POST /api/module/config`. The generic page does not submit module forms automatically.
+
+Here is the first implemented module, whose goal is to monitor some aquarium parameters: https://github.com/reivaxy/IOTAgents/tree/AquaMonitor
 
 ## 3) The base contract
 

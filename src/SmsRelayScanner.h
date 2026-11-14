@@ -9,8 +9,8 @@
 #include "Config.h"
 #include "GenericModule.h"
 
-#define IP_START 140
-#define IP_END 150
+#define IP_START 1
+#define IP_END 255
 
 // Finds the SmsRelay module on the home network (/24 subnet of this module) by calling
 // /api/ping (POST, JSON {"IP", "name"}) on x.x.x.0 .. x.x.x.255 until the answer is "SmsRelay", then stores the IP.

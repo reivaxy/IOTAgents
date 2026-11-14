@@ -460,7 +460,7 @@ class AquaMonitor : public GenericModule {
   static constexpr uint8_t WATER_LEVEL_OK_STATE = HIGH;  // pin state when water level is ok
   static constexpr int LIGHT_ON_THRESHOLD = 1000;  // raw ADC value (0-4095) above which light is on
   static constexpr uint8_t TEMPERATURE_RESOLUTION = 12;  // bits
-  static constexpr float TEMPERATURE_HYSTERESIS_C = 0.4f;
+  static constexpr float TEMPERATURE_HYSTERESIS_C = 0.2f;
 
   enum class TemperatureAlertState { Normal, TooLow, TooHigh };
   TemperatureAlertState tempAlertState_ = TemperatureAlertState::Normal;

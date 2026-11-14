@@ -344,10 +344,26 @@ class AquaMonitor : public GenericModule {
   void checkTemperatureAlert() {
     if (isnan(temperature_)) {
       checkAlert(true, tempAlertSent_, tempAlert_, "AquaMonitor: temperature probe not responding");
-    } else if (temperature_ < config_.tempMin) {
+      return;
+    }
+
+    // Keep an anomaly active until the reading is 0.4 C back inside its threshold.
+    // Track it independently of delivery so failed sends still retry in the hysteresis band.
+    if (temperature_ < config_.tempMin) {
+      tempAlertState_ = TemperatureAlertState::TooLow;
+    } else if (temperature_ > config_.tempMax) {
+      tempAlertState_ = TemperatureAlertState::TooHigh;
+    } else if ((tempAlertState_ == TemperatureAlertState::TooLow &&
+                temperature_ >= config_.tempMin + TEMPERATURE_HYSTERESIS_C) ||
+               (tempAlertState_ == TemperatureAlertState::TooHigh &&
+                temperature_ <= config_.tempMax - TEMPERATURE_HYSTERESIS_C)) {
+      tempAlertState_ = TemperatureAlertState::Normal;
+    }
+
+    if (tempAlertState_ == TemperatureAlertState::TooLow) {
       checkAlert(true, tempAlertSent_, tempAlert_,
                  "AquaMonitor: temperature too low (" + String(temperature_, 1) + " C)");
-    } else if (temperature_ > config_.tempMax) {
+    } else if (tempAlertState_ == TemperatureAlertState::TooHigh) {
       checkAlert(true, tempAlertSent_, tempAlert_,
                  "AquaMonitor: temperature too high (" + String(temperature_, 1) + " C)");
     } else {
@@ -444,6 +460,10 @@ class AquaMonitor : public GenericModule {
   static constexpr uint8_t WATER_LEVEL_OK_STATE = HIGH;  // pin state when water level is ok
   static constexpr int LIGHT_ON_THRESHOLD = 1000;  // raw ADC value (0-4095) above which light is on
   static constexpr uint8_t TEMPERATURE_RESOLUTION = 12;  // bits
+  static constexpr float TEMPERATURE_HYSTERESIS_C = 0.4f;
+
+  enum class TemperatureAlertState { Normal, TooLow, TooHigh };
+  TemperatureAlertState tempAlertState_ = TemperatureAlertState::Normal;
 
   AquaMonitorStore store_;
   AquaMonitorConfig config_;

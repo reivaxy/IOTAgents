@@ -4,16 +4,17 @@
 #include <ArduinoJson.h>
 #include "Platform.h"
 #include <WiFiClient.h>
+#include <functional>
 
 #include "Alert.h"
 #include "Config.h"
-#include "GenericModule.h"
 
 #define IP_START 1
 #define IP_END 255
 
 // Finds the SmsRelay module on the home network (/24 subnet of this module) by calling
-// /api/ping (POST, JSON {"IP", "name"}) on x.x.x.0 .. x.x.x.255 until the answer is "SmsRelay", then stores the IP.
+// /api/ping (POST, the same JSON payload as /api/status) on x.x.x.1 .. x.x.x.255
+// until the answer identifies "SmsRelay", then stores the IP.
 // Non blocking by steps: update() probes a single address per call, so it must be called
 // from loop(). Once connected to the home network, a stored SmsRelay IP is checked with
 // /api/ping; the scan starts automatically if none is stored or if the stored one does not
@@ -21,15 +22,17 @@
 // PING_INTERVAL_MS; a failed ping makes isNotFound() true until a later ping succeeds.
 class SmsRelayScanner {
  public:
+  using StatusProvider = std::function<JsonDocument()>;
+
   static constexpr uint32_t SAVE_CHECK_TIMEOUT_MS = 10000;  // connect and read, check on config save
   // Periodically ping the known SmsRelay IP to check its availability
   static constexpr uint32_t PING_INTERVAL_MS = 5UL * 60 * 1000;
 
-  void begin(Config& config, ConfigStore& store, Alert& alert, const GenericModule& module) {
+  void begin(Config& config, ConfigStore& store, Alert& alert, StatusProvider statusProvider) {
     config_ = &config;
     store_ = &store;
     alert_ = &alert;
-    module_ = &module;
+    statusProvider_ = statusProvider;
   }
 
   // Starts (or restarts) a scan. Returns false if not connected to the home network.
@@ -176,7 +179,7 @@ class SmsRelayScanner {
   Config* config_ = nullptr;
   ConfigStore* store_ = nullptr;
   Alert* alert_ = nullptr;
-  const GenericModule* module_ = nullptr;
+  StatusProvider statusProvider_;
   bool usingFallbackWifi_ = false;
   bool autoChecked_ = false;
   bool scanning_ = false;
@@ -213,12 +216,8 @@ class SmsRelayScanner {
   }
 
   bool probe(const String& url, uint32_t timeoutMs) {
-    // The ping tells SmsRelay who is calling:
-    // {"IP": <this module IP>, "name": <module name>, "type": <module type>}.
-    JsonDocument doc;
-    doc["IP"] = WiFi.localIP().toString();
-    doc["name"] = config_->name;
-    doc["type"] = module_ != nullptr ? module_->getType() : "generic";
+    // Share the status builder with /api/status, including device-specific fields.
+    JsonDocument doc = statusProvider_();
     String payload;
     serializeJson(doc, payload);
     Serial.printf("  ping POST %s %s\n", url.c_str(), payload.c_str());

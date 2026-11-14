@@ -139,6 +139,8 @@ static const char CONFIG_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
 <form id="f">
 <h2>Module</h2>
 <label>Module name<input id="name" maxlength="10" required></label>
+<p>IP address: <span id="moduleIp">-</span></p>
+<p>MAC address: <span id="moduleMac">-</span></p>
 <h2>Home network (STA)</h2>
 <label>SSID<input id="homeSsid" maxlength="32"></label>
 <label>Password<input id="homePwd" type="password" maxlength="63" autocomplete="new-password" placeholder="leave blank to keep current"></label>
@@ -181,6 +183,8 @@ async function load(){
     if(!r.ok)throw new Error('HTTP '+r.status);
     const d=await r.json();
     $('name').value=d.name;
+    $('moduleIp').textContent=d.ip;
+    $('moduleMac').textContent=d.mac;
     $('homeSsid').value=d.homeSsid;
     $('apSsid').value=d.apSsid||d.apSsidDefault;
     $('flip').checked=d.flipScreen;

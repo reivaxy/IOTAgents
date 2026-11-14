@@ -191,11 +191,11 @@ void setup() {
 
   timeSync.begin(config, configStore);
   alert.begin(config);
-  smsRelayScanner.begin(config, configStore, alert, module);
+  httpServer.setModule(module);
+  smsRelayScanner.begin(config, configStore, alert, []() { return httpServer.getStatus(); });
   module.begin();
   startWifi();
 
-  httpServer.setModule(module);
   httpServer.begin();
 
   const IPAddress ip = WiFi.getMode() == WIFI_AP ? WiFi.softAPIP() : WiFi.localIP();

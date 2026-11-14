@@ -57,6 +57,35 @@ class HttpServer {
 
   void handleClient() { server_.handleClient(); }
 
+  // Shared by the HTTP status endpoint and outgoing SmsRelay pings.
+  JsonDocument getStatus() {
+    JsonDocument doc;
+    if (module_ != nullptr) {
+      JsonDocument moduleStatus = module_->getStatus();
+      doc["module"].set(moduleStatus.as<JsonVariantConst>());
+    }
+    doc["IP"] = (WiFi.getMode() == WIFI_AP ? WiFi.softAPIP() : WiFi.localIP()).toString();
+    doc["MAC"] = WiFi.getMode() == WIFI_AP ? WiFi.softAPmacAddress() : WiFi.macAddress();
+    doc["name"] = config_.name;
+    doc["type"] = module_ ? module_->getType() : "generic";
+  #if defined(ESP8266)
+    doc["board"] = "esp8266";
+  #else
+    doc["board"] = "esp32";
+  #endif
+    doc["smsRelayNotFound"] = smsRelayScanner_.isNotFound();
+    doc["smsRelayIp"] = config_.smsRelayIp;
+    doc["homeWifiConnected"] = (WiFi.getMode() == WIFI_STA && WiFi.status() == WL_CONNECTED);
+    doc["hasfallbackWifi"] = !config_.fallbackSsid.isEmpty();
+    if (timeSync_.isSynced()) {
+      doc["epoch"] = static_cast<int64_t>(timeSync_.now());
+      doc["utcOffset"] = timeSync_.utcOffset();
+    } else {
+      doc["epoch"] = nullptr;
+    }
+    return doc;
+  }
+
  private:
   static constexpr size_t NAME_MAX_LEN = 10;
   static constexpr size_t SSID_MAX_LEN = 32;
@@ -118,28 +147,7 @@ class HttpServer {
   }
 
   void handleStatus() {
-    JsonDocument doc;
-    if (module_ != nullptr) {
-      JsonDocument moduleStatus = module_->getStatus();
-      doc["module"].set(moduleStatus.as<JsonVariantConst>());
-    }
-    doc["name"] = config_.name;
-    doc["type"] = module_ ? module_->getType() : "generic";
-  #if defined(ESP8266)
-    doc["board"] = "esp8266";
-  #else
-    doc["board"] = "esp32";
-  #endif
-    doc["smsRelayNotFound"] = smsRelayScanner_.isNotFound();
-    doc["smsRelayIp"] = config_.smsRelayIp;
-    doc["homeWifiConnected"] = (WiFi.getMode() == WIFI_STA && WiFi.status() == WL_CONNECTED);
-    doc["hasfallbackWifi"] = !config_.fallbackSsid.isEmpty();
-    if (timeSync_.isSynced()) {
-      doc["epoch"] = static_cast<int64_t>(timeSync_.now());
-      doc["utcOffset"] = timeSync_.utcOffset();
-    } else {
-      doc["epoch"] = nullptr;
-    }
+    JsonDocument doc = getStatus();
     sendJson(200, doc, false);
   }
 
@@ -147,6 +155,8 @@ class HttpServer {
     // Passwords are intentionally never exposed.
     JsonDocument doc;
     doc["name"] = config_.name;
+    doc["ip"] = (WiFi.getMode() == WIFI_AP ? WiFi.softAPIP() : WiFi.localIP()).toString();
+    doc["mac"] = WiFi.getMode() == WIFI_AP ? WiFi.softAPmacAddress() : WiFi.macAddress();
     doc["homeSsid"] = config_.homeSsid;
     doc["apSsid"] = config_.apSsid;
     doc["apSsidDefault"] = ConfigDefaults::AP_SSID;

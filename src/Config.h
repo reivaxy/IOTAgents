@@ -27,7 +27,6 @@ struct Config {
 class ConfigStore {
  public:
   Config load() {
-    migrateLegacyPreferences();
     Config c;
     Preferences prefs;
     prefs.begin(NAMESPACE, true);

@@ -58,7 +58,7 @@ Each module is different in behavior and UI. Typical per-module logic includes:
 
 - the device type name, such as `feeder` or `aquamonitor`
 - custom status data returned by `getStatus()` under the `module` object in `/api/status`
-- custom rows / script injected on the home status page via `getStatusHtml()`
+- custom rows / script injected on the home status page via `getHomeHtml()`
 - custom config page content via `getConfigHtml()`
 - validation and persistence of device-specific settings in `saveConfig()`
 - custom `begin()` and `update()` logic for sensor polling, actuator control, timers, etc.
@@ -78,7 +78,7 @@ class GenericModule {
   virtual void begin() {}
   virtual void update() {}
   virtual JsonDocument getStatus() { ... }
-  virtual String getStatusHtml() { ... }
+  virtual String getHomeHtml() { ... }
   virtual String getConfigHtml() { ... }
   virtual bool saveConfig(JsonObjectConst cfg, String& error) { ... }
 };
@@ -146,7 +146,7 @@ class FeederModule : public GenericModule {
     return doc;
   }
 
-  String getStatusHtml() override {
+  String getHomeHtml() override {
     return R"(
       <tr><td>Feeder</td><td id="feederStatus">-</td></tr>
       <script>
@@ -227,7 +227,7 @@ Specific for each device:
 
 - `getType()` return value
 - custom `getStatus()` payload
-- custom `getStatusHtml()` markup
+- custom `getHomeHtml()` markup
 - custom `getConfigHtml()` form
 - custom `saveConfig()` handling
 - device-specific scheduling, sensor processing, logic, alarms, and actuators

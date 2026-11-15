@@ -108,7 +108,7 @@ class HttpServer {
 
   void setupRoutes() {
     server_.on("/", HTTP_GET, [this]() {
-      sendPage(HOME_PAGE, MODULE_STATUS_MARKER, module_ ? module_->getStatusHtml() : String());
+      sendPage(HOME_PAGE, MODULE_STATUS_MARKER, module_ ? module_->getHomeHtml() : String());
     });
     server_.on("/config", HTTP_GET, [this]() { server_.send(200, "text/html", CONFIG_PAGE); });
     server_.on("/module/config", HTTP_GET, [this]() {

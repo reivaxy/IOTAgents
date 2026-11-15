@@ -17,7 +17,7 @@ class HttpServer;  // include "HttpServer.h" in the module implementation to use
 //
 // HTML fragment contracts (the fragments are inserted as is into the generic pages):
 //
-// getStatusHtml(): `<tr><td>Label</td><td id="x">-</td></tr>` rows added to the home page status
+// getHomeHtml(): `<tr><td>Label</td><td id="x">-</td></tr>` rows added to the home page status
 //   table, optionally followed by a <script> defining `function moduleStatus(module){...}`. It is
 //   called with the `module` object from /api/status after every refresh (typically to fill cells).
 //
@@ -56,7 +56,7 @@ class GenericModule {
   }
 
   // Rows (and optional script) displayed on the home page; see class comment.
-  virtual String getStatusHtml() { return String("<h1>Override the getStatusHtml() method</h1>"); }
+  virtual String getHomeHtml() { return String("<h1>Override the getHomeHtml() method</h1>"); }
 
   // Module-specific settings section; see class comment.
   virtual String getConfigHtml() { return String("<h1>Override the getConfigHtml() method</h1>"); }

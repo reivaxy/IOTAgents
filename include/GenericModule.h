@@ -3,10 +3,10 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
 
-#include "Alert.h"
-#include "Config.h"
-#include "Display.h"
-#include "TimeSync.h"
+class Alert;
+struct Config;
+class Display;
+class TimeSync;
 
 class HttpServer;  // include "HttpServer.h" in the module implementation to use it
 
@@ -30,44 +30,31 @@ class HttpServer;  // include "HttpServer.h" in the module implementation to use
 class GenericModule {
  public:
   GenericModule(Display& display, Config& config, Alert& alert, HttpServer& httpServer,
-                TimeSync& timeSync)
-      : display_(display),
-        config_(config),
-        alert_(alert),
-        httpServer_(httpServer),
-        timeSync_(timeSync) {}
+                TimeSync& timeSync);
 
-  virtual ~GenericModule() = default;
+  virtual ~GenericModule();
 
   // Identifies the kind of device (e.g. "feeder", "aquamonitor"); concrete modules override it.
-  virtual const char* getType() const { return "generic"; }
+  virtual const char* getType() const;
 
   // Called once from setup(), before the HTTP server starts (the place to register extra routes).
-  virtual void begin() {}
+  virtual void begin();
 
   // Called from loop().
-  virtual void update() {}
+  virtual void update();
 
   // Module-specific fields nested under "module" in the /api/status answer.
-  virtual JsonDocument getStatus() {
-    JsonDocument doc;
-    doc["message"] = "override the getStatus method";
-    return doc;
-  }
+  virtual JsonDocument getStatus();
 
   // Rows (and optional script) displayed on the home page; see class comment.
-  virtual String getHomeHtml() { return String("<h1>Override the getHomeHtml() method</h1>"); }
+  virtual String getHomeHtml();
 
   // Module-specific settings section; see class comment.
-  virtual String getConfigHtml() { return String("<h1>Override the getConfigHtml() method</h1>"); }
+  virtual String getConfigHtml();
 
   // Receives the JSON posted to /api/module/config. Validates, applies and persists the values
   // (in the module's own NVS namespace). Returns false and sets `error` to reject them.
-  virtual bool saveConfig(JsonObjectConst cfg, String& error) {
-    (void)cfg;
-    error = "This module has no specific settings";
-    return false;
-  }
+  virtual bool saveConfig(JsonObjectConst cfg, String& error);
 
  protected:
   Display& display_;

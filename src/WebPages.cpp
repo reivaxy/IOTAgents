@@ -1,9 +1,7 @@
-#pragma once
-
-#include <Arduino.h>
+#include "WebPages.h"
 
 // Stylesheet shared by all the pages (served as /style.css)
-static const char STYLE[] PROGMEM = R"rawliteral(
+const char STYLE[] PROGMEM = R"rawliteral(
 body{font-family:Arial,sans-serif;max-width:600px;margin:5px auto;padding:5px;background:#f5f5f5;color:#333}
 .container{background:#fff;padding:10px 12px;border-radius:8px;box-shadow:0 2px 4px rgba(0,0,0,.1)}
 a{color:#007bff;text-decoration:none}
@@ -48,7 +46,7 @@ p.nok:not(:empty){background:#f8d7da;border:1px solid #f5c6cb}
 #define NAV_MODULE_HERE "<span>Module settings</span>"
 #define NAV_CONFIG_HERE "<span>Generic Settings</span>"
 
-static const char HOME_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
+const char HOME_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Aqua Monitor</title><link rel="stylesheet" href="/style.css"></head>
 <body><div class="container">
@@ -100,7 +98,7 @@ setInterval(showTime,1000);
 </div></body></html>
 )rawliteral";
 
-static const char MODULE_CONFIG_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
+const char MODULE_CONFIG_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Module settings</title><link rel="stylesheet" href="/style.css"></head>
 <body><div class="container">
@@ -129,7 +127,7 @@ loadModuleInfo();
 </div></body></html>
 )rawliteral";
 
-static const char CONFIG_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
+const char CONFIG_PAGE[] PROGMEM = R"rawliteral(<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Generic Settings</title><link rel="stylesheet" href="/style.css"></head>
 <body><div class="container">

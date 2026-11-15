@@ -2,6 +2,7 @@
 #include "Platform.h"
 
 #include "Alert.h"
+#include "AquaFeederModule.h"
 #include "Config.h"
 #include "Display.h"
 #include "GenericModule.h"
@@ -34,8 +35,7 @@ void scheduleReboot() {
 
 HttpServer httpServer(config, configStore, timeSync, display, smsRelayScanner, scheduleReboot);
 
-// Replace GenericModule by the class of the actual device module.
-GenericModule module(display, config, alert, httpServer, timeSync);
+AquaFeederModule module(display, config, alert, httpServer, timeSync);
 
 // ---------------------------------------------------------------- WiFi
 

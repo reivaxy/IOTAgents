@@ -1,3 +1,27 @@
+
+# AquaFeeder
+
+This branch runs [AquaFeederModule](src/AquaFeederModule.h), an aquarium feeder extending `GenericModule`.
+Motor operation and the food-detection sensor are currently **mocked**: no physical food is dispensed.
+Quantities are integer dispenser units (1-10000), not grams; calibration and GPIO control remain hardware integration work.
+
+- **Module settings** configures zero to four daily local-time feeds. Leave both fields of an unused slot blank. Duplicate times are rejected.
+- Schedules and previous feed results persist in the module-specific `aquafeeder` Preferences namespace, separately from shared settings.
+- Automatic feeding waits for synchronized time and a known UTC offset. It executes during the configured minute, skips missed minutes (no catch-up meals), and persists an execution marker before dispensing to prevent repeat meals after reboot. Power loss after the marker is saved can skip that meal rather than risk a duplicate.
+- **Home** shows the previous feed attempt (time, quantity, success/failure), next scheduled feed, errors, a manual quantity form, and reverse control. A reverse run is not recorded as a meal and does not clear an existing failure. Manual feeds work without synchronized time; their timestamp is shown as unavailable.
+
+Module APIs (JSON bodies):
+
+| Method | Path | Body / purpose |
+| --- | --- | --- |
+| GET | `/api/feeder/config` | Returns `{"feeds":[{"time":"08:00","quantity":10}]}` |
+| POST | `/api/module/config` | Saves the same shape; `{"feeds":[]}` disables all scheduled meals |
+| POST | `/api/feeder/run` | `{"quantity":10}` feeds once; `{"quantity":-100}` reverses |
+| POST | `/api/feeder/mock-sensor` | `{"ok":false}` simulates food-detection failures; `{"ok":true}` restores success (also the reboot default) |
+| GET | `/api/status` | Feeder state under `module`, including `previous`, `next`, `alert`, and `storageError` |
+
+Invalid run requests return HTTP 400; simulated dispensing failures return HTTP 500 and remain visible until a successful feed. The sensor mock affects both manual and scheduled feeds. The APIs use the existing unauthenticated local-network server; do not expose it to the Internet.
+
 # IOTAgents module architecture
 
 This project is built around a shared base class, `GenericModule`, and a set of device-specific implementations. The idea is:

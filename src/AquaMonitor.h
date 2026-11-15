@@ -124,7 +124,7 @@ class AquaMonitor : public GenericModule {
       const int raw = digitalRead(WATER_LEVEL_PIN);
       waterLevelOk_ = (raw == WATER_LEVEL_OK_STATE);
       Serial.printf("AquaMonitor water level: pin %d -> %s\n", raw, waterLevelOk_ ? "OK" : "NOK");
-      checkAlert(!waterLevelOk_, waterAlertSent_, waterAlert_, "AquaMonitor: water level too low");
+      checkAlert(!waterLevelOk_, waterAlertSent_, waterAlert_, "Water level too low");
     }
 
     if (now - lastLightRead_ >= READ_PERIOD_MS) {
@@ -343,7 +343,7 @@ class AquaMonitor : public GenericModule {
 
   void checkTemperatureAlert() {
     if (isnan(temperature_)) {
-      checkAlert(true, tempAlertSent_, tempAlert_, "AquaMonitor: temperature probe not responding");
+      checkAlert(true, tempAlertSent_, tempAlert_, "Temperature probe not responding");
       return;
     }
 
@@ -362,10 +362,10 @@ class AquaMonitor : public GenericModule {
 
     if (tempAlertState_ == TemperatureAlertState::TooLow) {
       checkAlert(true, tempAlertSent_, tempAlert_,
-                 "AquaMonitor: temperature too low (" + String(temperature_, 1) + " C)");
+                 "Temperature too low (" + String(temperature_, 1) + " C)");
     } else if (tempAlertState_ == TemperatureAlertState::TooHigh) {
       checkAlert(true, tempAlertSent_, tempAlert_,
-                 "AquaMonitor: temperature too high (" + String(temperature_, 1) + " C)");
+                 "Temperature too high (" + String(temperature_, 1) + " C)");
     } else {
       checkAlert(false, tempAlertSent_, tempAlert_, "");
     }
@@ -400,9 +400,9 @@ class AquaMonitor : public GenericModule {
     }
 
     if (mustBeOn && !lightOn_) {
-      checkAlert(true, lightAlertSent_, lightAlert_, "AquaMonitor: light is OFF but should be ON");
+      checkAlert(true, lightAlertSent_, lightAlert_, "Light is OFF but should be ON");
     } else if (mustBeOff && lightOn_) {
-      checkAlert(true, lightAlertSent_, lightAlert_, "AquaMonitor: light is ON but should be OFF");
+      checkAlert(true, lightAlertSent_, lightAlert_, "Light is ON but should be OFF");
     } else {
       checkAlert(false, lightAlertSent_, lightAlert_, "");  // state matches the restriction
     }

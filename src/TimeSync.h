@@ -116,7 +116,7 @@ class TimeSync {
     HTTPClient http;
     setHttpConnectTimeout(client, http, HTTP_TIMEOUT_MS);
     http.setTimeout(HTTP_TIMEOUT_MS);
-    http.setUserAgent("NewAquaMonitor/1.0");
+    http.setUserAgent("IOTAgent/1.0");
     http.setReuse(false);  // one request per connection: "Connection: close", socket closed by end()
     if (!http.begin(client, OFFSET_URL)) {
       return false;

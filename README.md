@@ -56,11 +56,13 @@ The base contract is defined in [src/GenericModule.h](src/GenericModule.h).
 
 The shared platform supports **ESP32 and ESP8266** with the same module contract, web pages, JSON API, WiFi fallback, time synchronization, alerts, and browser-based firmware updates. Check the available profiles in [platformio.ini](platformio.ini).
 
+Specialized modules should try to keep this compatibility whenever possible, but ESP8266 are much slower and have much less memory. Just reading their status using the /api/status endpoint is noticeably slower than on an ESP32.
+
 Both profiles use the Arduino framework, C++17, and a 115200-baud serial monitor. Set the upload and monitor ports to match your device. Select the corresponding environment in PlatformIO to build, upload, or monitor it.
 
 [src/Platform.h](src/Platform.h) handles differences in WiFi headers, HTTP clients, web server types, WiFi sleep control, and firmware update APIs. Include it when module code needs those shared networking APIs rather than importing ESP32-only headers. ESP8266 uses an `ESP8266WebServer` alias named `WebServer`.
 
-Settings use the `Preferences` API: native NVS on ESP32 and the `vshymanskyy/Preferences@^2.1.0` compatibility library on ESP8266. Device-specific settings should use their own namespace rather than the shared `aquamon` namespace used by `ConfigStore`; do not assume ESP32-native NVS APIs are portable.
+Settings use the `Preferences` API: native NVS on ESP32 and the `vshymanskyy/Preferences@^2.1.0` compatibility library on ESP8266. Device-specific settings should use their own namespace rather than the shared `generic` namespace used by `ConfigStore`; do not assume ESP32-native NVS APIs are portable.
 
 The SSD1306 OLED is configured at I2C address `0x3C` in [src/Display.h](src/Display.h):
 
@@ -100,7 +102,7 @@ Each module is different in behavior and UI. Typical per-module logic includes:
 
 - the device type name, such as `feeder` or `aquamonitor`
 - custom status data returned by `getStatus()` under the `module` object in `/api/status`
-- custom rows / script injected on the home status page via `getStatusHtml()`
+- custom rows / script injected on the home status page via `getHomeHtml()`
 - custom config page content via `getConfigHtml()`
 - validation and persistence of device-specific settings in `saveConfig()`
 - custom `begin()` and `update()` logic for sensor polling, actuator control, timers, etc.
@@ -120,7 +122,7 @@ class GenericModule {
   virtual void begin() {}
   virtual void update() {}
   virtual JsonDocument getStatus() { ... }
-  virtual String getStatusHtml() { ... }
+  virtual String getHomeHtml() { ... }
   virtual String getConfigHtml() { ... }
   virtual bool saveConfig(JsonObjectConst cfg, String& error) { ... }
 };
@@ -188,7 +190,7 @@ class FeederModule : public GenericModule {
     return doc;
   }
 
-  String getStatusHtml() override {
+  String getHomeHtml() override {
     return R"(
       <tr><td>Feeder</td><td id="feederStatus">-</td></tr>
       <script>
@@ -269,7 +271,7 @@ Specific for each device:
 
 - `getType()` return value
 - custom `getStatus()` payload
-- custom `getStatusHtml()` markup
+- custom `getHomeHtml()` markup
 - custom `getConfigHtml()` form
 - custom `saveConfig()` handling
 - device-specific scheduling, sensor processing, logic, alarms, and actuators

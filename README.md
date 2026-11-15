@@ -18,7 +18,7 @@ Both profiles use the Arduino framework, C++17, and a 115200-baud serial monitor
 
 [src/Platform.h](src/Platform.h) handles differences in WiFi headers, HTTP clients, web server types, WiFi sleep control, and firmware update APIs. Include it when module code needs those shared networking APIs rather than importing ESP32-only headers. ESP8266 uses an `ESP8266WebServer` alias named `WebServer`.
 
-Settings use the `Preferences` API: native NVS on ESP32 and the `vshymanskyy/Preferences@^2.1.0` compatibility library on ESP8266. Device-specific settings should use their own namespace rather than the shared `aquamon` namespace used by `ConfigStore`; do not assume ESP32-native NVS APIs are portable.
+Settings use the `Preferences` API: native NVS on ESP32 and the `vshymanskyy/Preferences@^2.1.0` compatibility library on ESP8266. Device-specific settings should use their own namespace rather than the shared `generic` namespace used by `ConfigStore`; do not assume ESP32-native NVS APIs are portable.
 
 The SSD1306 OLED is configured at I2C address `0x3C` in [src/Display.h](src/Display.h):
 

@@ -4,8 +4,8 @@
 #include <Preferences.h>
 
 namespace ConfigDefaults {
-constexpr const char* MODULE_NAME = "NewAquaMonitor";
-constexpr const char* AP_SSID = "NewAquaMonitor";
+constexpr const char* MODULE_NAME = "IOTAgent_Generic";
+constexpr const char* AP_SSID = "IOTAgent";
 constexpr const char* AP_PWD = "password";
 }  // namespace ConfigDefaults
 
@@ -27,6 +27,7 @@ struct Config {
 class ConfigStore {
  public:
   Config load() {
+    migrateLegacyPreferences();
     Config c;
     Preferences prefs;
     prefs.begin(NAMESPACE, true);
@@ -88,5 +89,6 @@ class ConfigStore {
   }
 
  private:
-  static constexpr const char* NAMESPACE = "aquamon";
+  static constexpr const char* NAMESPACE = "generic";
+
 };

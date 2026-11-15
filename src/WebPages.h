@@ -2,6 +2,14 @@
 
 #include <Arduino.h>
 
+// Stylesheet shared by all the pages (served as /style.css).
+extern const char STYLE[] PROGMEM;
+extern const char HOME_PAGE[] PROGMEM;
+extern const char MODULE_CONFIG_PAGE[] PROGMEM;
+extern const char CONFIG_PAGE[] PROGMEM;#pragma once
+
+#include <Arduino.h>
+
 // Stylesheet shared by all the pages (served as /style.css)
 static const char STYLE[] PROGMEM = R"rawliteral(
 body{font-family:Arial,sans-serif;max-width:600px;margin:5px auto;padding:5px;background:#f5f5f5;color:#333}

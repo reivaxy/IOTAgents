@@ -6,7 +6,7 @@ This project is built around a shared base class, `GenericModule`, and a set of 
 - each device type (for example, `feeder` and `aquamonitor`) gets its own branch and module class deriving from `GenericModule`
 - only the device-specific behavior is overridden
 
-The base contract is defined in [src/GenericModule.h](src/GenericModule.h).
+The base contract is declared in [include/GenericModule.h](include/GenericModule.h) and implemented in [src/GenericModule.cpp](src/GenericModule.cpp). Project headers live in `include/`, with implementations in `src/`; PlatformIO automatically adds `include/` to the header search path.
 
 ## ESP32 and ESP8266 compatibility
 
@@ -16,11 +16,11 @@ Specialized modules should try to keep this compatibility whenever possible, but
 
 Both profiles use the Arduino framework, C++17, and a 115200-baud serial monitor. Set the upload and monitor ports to match your device. Select the corresponding environment in PlatformIO to build, upload, or monitor it.
 
-[src/Platform.h](src/Platform.h) handles differences in WiFi headers, HTTP clients, web server types, WiFi sleep control, and firmware update APIs. Include it when module code needs those shared networking APIs rather than importing ESP32-only headers. ESP8266 uses an `ESP8266WebServer` alias named `WebServer`.
+[include/Platform.h](include/Platform.h) and [src/Platform.cpp](src/Platform.cpp) handle differences in WiFi headers, HTTP clients, web server types, WiFi sleep control, and firmware update APIs. Include the header when module code needs those shared networking APIs rather than importing ESP32-only headers. ESP8266 uses an `ESP8266WebServer` alias named `WebServer`.
 
 Settings use the `Preferences` API: native NVS on ESP32 and the `vshymanskyy/Preferences@^2.1.0` compatibility library on ESP8266. Device-specific settings should use their own namespace rather than the shared `generic` namespace used by `ConfigStore`; do not assume ESP32-native NVS APIs are portable.
 
-The SSD1306 OLED is configured at I2C address `0x3C` in [src/Display.h](src/Display.h):
+The SSD1306 OLED is configured at I2C address `0x3C` in [src/Display.cpp](src/Display.cpp):
 
 | Target | SDA | SCL |
 | --- | --- | --- |
@@ -88,7 +88,7 @@ The default `begin()` and `update()` do nothing. The status and HTML methods ret
 
 The constructor receives `Display`, `Config`, `Alert`, `HttpServer`, and `TimeSync` references, available to subclasses as `display_`, `config_`, `alert_`, `httpServer_`, and `timeSync_`. The base class also has a virtual destructor.
 
-`begin()` runs once in `setup()`, after the shared services are initialized but before WiFi connection and HTTP server startup. Extra routes can be registered through `httpServer_.webServer()` there; include [src/HttpServer.h](src/HttpServer.h) in the implementation when using it. `update()` runs on every `loop()` iteration and should return promptly so shared services remain responsive.
+`begin()` runs once in `setup()`, after the shared services are initialized but before WiFi connection and HTTP server startup. Extra routes can be registered through `httpServer_.webServer()` there; include [include/HttpServer.h](include/HttpServer.h) in the implementation when using it. `update()` runs on every `loop()` iteration and should return promptly so shared services remain responsive.
 
 `saveConfig()` must validate, apply, and persist module settings itself. Return `true` for HTTP 200 with `{"ok":true}`, or return `false` and set `error` for HTTP 400 with `{"error":"..."}`. Loading persisted module settings is also the subclass's responsibility, typically in `begin()`.
 
@@ -220,7 +220,7 @@ Common for every device:
 - base lifecycle (`begin()`, `update()`)
 - generic status and config infrastructure
 - shared WiFi / HTTP / networking behavior
-- ESP32 / ESP8266 compatibility through [src/Platform.h](src/Platform.h)
+- ESP32 / ESP8266 compatibility through [include/Platform.h](include/Platform.h) and [src/Platform.cpp](src/Platform.cpp)
 - platform-wide defaults and project setup
 
 Specific for each device:

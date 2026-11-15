@@ -1,7 +1,6 @@
 #pragma once
 
 #include <Arduino.h>
-#include <Preferences.h>
 
 namespace ConfigDefaults {
 constexpr const char* MODULE_NAME = "IOTAgent_Generic";
@@ -26,66 +25,17 @@ struct Config {
 // Persists Config in NVS through Preferences.
 class ConfigStore {
  public:
-  Config load() {
-    Config c;
-    Preferences prefs;
-    prefs.begin(NAMESPACE, true);
-    c.name = prefs.getString("name", ConfigDefaults::MODULE_NAME);
-    c.homeSsid = prefs.getString("homeSsid", "");
-    c.homePwd = prefs.getString("homePwd", "");
-    c.apSsid = prefs.getString("apSsid", "");
-    c.apPwd = prefs.getString("apPwd", "");
-    c.fallbackSsid = prefs.getString("fallbackSsid", "");
-    c.fallbackPwd = prefs.getString("fallbackPwd", "");
-    c.flipScreen = prefs.getBool("flip", true);
-    c.smsRelayIp = prefs.getString("smsRelayIp", "");
-    c.utcOffset = prefs.getInt("utcOffset", 0);
-    c.utcOffsetReadAt = prefs.getLong64("utcOffsetAt", 0);
-    prefs.end();
-    return c;
-  }
+  Config load();
 
-  void save(const Config& c) {
-    Preferences prefs;
-    prefs.begin(NAMESPACE, false);
-    prefs.putString("name", c.name);
-    prefs.putString("homeSsid", c.homeSsid);
-    prefs.putString("homePwd", c.homePwd);
-    prefs.putString("apSsid", c.apSsid);
-    prefs.putString("apPwd", c.apPwd);
-    prefs.putString("smsRelayIp", c.smsRelayIp);
-    prefs.end();
-  }
+  void save(const Config& c);
 
-  void saveFlipScreen(const Config& c) {
-    Preferences prefs;
-    prefs.begin(NAMESPACE, false);
-    prefs.putBool("flip", c.flipScreen);
-    prefs.end();
-  }
+  void saveFlipScreen(const Config& c);
 
-  void saveSmsRelayIp(const Config& c) {
-    Preferences prefs;
-    prefs.begin(NAMESPACE, false);
-    prefs.putString("smsRelayIp", c.smsRelayIp);
-    prefs.end();
-  }
+  void saveSmsRelayIp(const Config& c);
 
-  void saveFallbackWifi(const Config& c) {
-    Preferences prefs;
-    prefs.begin(NAMESPACE, false);
-    prefs.putString("fallbackSsid", c.fallbackSsid);
-    prefs.putString("fallbackPwd", c.fallbackPwd);
-    prefs.end();
-  }
+  void saveFallbackWifi(const Config& c);
 
-  void saveUtcOffset(const Config& c) {
-    Preferences prefs;
-    prefs.begin(NAMESPACE, false);
-    prefs.putInt("utcOffset", c.utcOffset);
-    prefs.putLong64("utcOffsetAt", c.utcOffsetReadAt);
-    prefs.end();
-  }
+  void saveUtcOffset(const Config& c);
 
  private:
   static constexpr const char* NAMESPACE = "generic";

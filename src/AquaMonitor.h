@@ -188,7 +188,7 @@ class AquaMonitor : public GenericModule {
     return doc;
   }
 
-  String getStatusHtml() override {
+  String getHomeHtml() override {
     String html;
     html += "<tr><td>Temperature</td><td id=\"temp\" class=\"\">-</td></tr>\n";
     html += "<tr><td>Light</td><td id=\"light\" class=\"\">-</td></tr>\n";

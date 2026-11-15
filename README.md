@@ -12,6 +12,8 @@ The base contract is defined in [src/GenericModule.h](src/GenericModule.h).
 
 The shared platform supports **ESP32 and ESP8266** with the same module contract, web pages, JSON API, WiFi fallback, time synchronization, alerts, and browser-based firmware updates. Check the available profiles in [platformio.ini](platformio.ini).
 
+Specialized modules should try to keep this compatibility whenever possible, but ESP8266 are much slower and have much less memory. Just reading their status using the /api/status endpoint is noticeably slower than on an ESP32.
+
 Both profiles use the Arduino framework, C++17, and a 115200-baud serial monitor. Set the upload and monitor ports to match your device. Select the corresponding environment in PlatformIO to build, upload, or monitor it.
 
 [src/Platform.h](src/Platform.h) handles differences in WiFi headers, HTTP clients, web server types, WiFi sleep control, and firmware update APIs. Include it when module code needs those shared networking APIs rather than importing ESP32-only headers. ESP8266 uses an `ESP8266WebServer` alias named `WebServer`.
